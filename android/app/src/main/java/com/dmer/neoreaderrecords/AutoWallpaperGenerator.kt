@@ -48,6 +48,7 @@ object AutoWallpaperGenerator {
         val receiptTitleSize: Float,
         val receiptBodySize: Float,
         val footerMode: String,
+        val barcodeStyle: String,
         val noteText: String,
         val chartStyleMode: String,
         val showPeakLabel: Boolean,
@@ -113,6 +114,7 @@ object AutoWallpaperGenerator {
             receiptTitleSize = p.getFloat("receipt_title_size", 74f).coerceIn(24f, 120f),
             receiptBodySize = p.getFloat("receipt_body_size", 34f).coerceIn(18f, 60f),
             footerMode = p.getString("footer_mode", "NONE") ?: "NONE",
+            barcodeStyle = p.getString("barcode_style", "CLASSIC") ?: "CLASSIC",
             noteText = p.getString("note_text", "") ?: "",
             chartStyleMode = p.getString("chart_style_mode", "LINE") ?: "LINE",
             showPeakLabel = p.getBoolean("show_peak_label", true),
@@ -143,7 +145,7 @@ object AutoWallpaperGenerator {
         val summaryBlock = 30f + 60f + 50f
         val chartBlock = if (s0.showChart) 260f else 0f
         val hasFooter = s0.footerMode != "NONE" && s0.noteText.isNotBlank()
-        val footerBlock = if (!hasFooter) 0f else if (s0.footerMode == "BARCODE") 280f else 130f
+        val footerBlock = if (!hasFooter) 0f else if (s0.footerMode == "BARCODE") 320f else 130f
         val requiredH = headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
         val fitScale = (h.toFloat() - 40f) / requiredH
         val gs = fitScale.coerceIn(0.52f, 1f)
@@ -255,26 +257,120 @@ object AutoWallpaperGenerator {
             if (s0.footerMode == "NOTE") {
                 c.drawText("备注: ${shortTitle(s0.noteText, 40)}", s(60f), baseY + s(58f), text)
             } else if (s0.footerMode == "BARCODE") {
-                val qr = buildQrBitmap(s0.noteText, s(168f).toInt().coerceAtLeast(120))
-                if (qr != null) {
-                    val qrX = s(60f)
-                    val qrY = baseY + s(18f)
-                    c.drawBitmap(qr, qrX, qrY, null)
-                    val decorX = qrX + qr.width + s(24f)
-                    val decorY = qrY + s(10f)
-                    val decorW = (w - decorX - s(60f)).coerceAtLeast(s(220f))
-                    val decorH = (qr.height - s(20f)).toFloat().coerceAtLeast(s(60f))
-                    drawBarcodeDecor(c, decorX, decorY, decorW, decorH, s0.noteText, black)
-                    val textY = qrY + qr.height + s(34f)
-                    c.drawText(shortTitle(s0.noteText, 36), qrX, textY, mono)
-                } else {
-                    c.drawText("二维码生成失败，备注: ${shortTitle(s0.noteText, 36)}", s(60f), baseY + s(58f), text)
-                }
+                drawBarcodeFooter(
+                    canvas = c,
+                    noteText = s0.noteText,
+                    style = s0.barcodeStyle,
+                    startY = baseY,
+                    width = w.toFloat(),
+                    scale = ::s,
+                    textPaint = text,
+                    monoPaint = mono,
+                    linePaint = line
+                )
             }
         }
 
         drawSourceCornerMark(c, w, h, sourceMark, gs)
         return bmp
+    }
+
+    private fun drawBarcodeFooter(
+        canvas: Canvas,
+        noteText: String,
+        style: String,
+        startY: Float,
+        width: Float,
+        scale: (Float) -> Float,
+        textPaint: Paint,
+        monoPaint: Paint,
+        linePaint: Paint
+    ) {
+        val left = scale(60f)
+        val right = width - scale(60f)
+        val contentTop = startY + scale(18f)
+        val qrSize = scale(132f).toInt().coerceAtLeast(96)
+        val qr = buildQrBitmap(noteText, qrSize)
+        val code = buildCode128Bitmap(noteText, scale(720f).toInt().coerceAtLeast(260), scale(88f).toInt().coerceAtLeast(52))
+        val safeNote = shortTitle(noteText, 44)
+
+        when (style) {
+            "MINIMAL" -> {
+                val y = contentTop + scale(8f)
+                if (code != null) {
+                    val x = left + ((right - left - code.width) / 2f).coerceAtLeast(0f)
+                    canvas.drawBitmap(code, x, y, null)
+                    canvas.drawText(shortTitle(noteText, 20), x, y + code.height + scale(28f), monoPaint)
+                } else {
+                    canvas.drawText("条码生成失败，备注: $safeNote", left, contentTop + scale(48f), textPaint)
+                }
+            }
+            "TICKET" -> {
+                if (qr != null && code != null) {
+                    val qrX = left
+                    val qrY = contentTop
+                    val codeX = qrX + qr.width + scale(20f)
+                    val codeY = qrY + scale(18f)
+                    canvas.drawBitmap(qr, qrX, qrY, null)
+                    canvas.drawText("LINK", qrX + scale(4f), qrY - scale(6f), monoPaint)
+                    val maxCodeW = (right - codeX).toInt().coerceAtLeast(120)
+                    val codeBmp = if (code.width > maxCodeW) {
+                        Bitmap.createScaledBitmap(code, maxCodeW, code.height, true)
+                    } else code
+                    canvas.drawBitmap(codeBmp, codeX, codeY, null)
+                    canvas.drawText(safeNote, left, qrY + qr.height + scale(34f), monoPaint)
+                } else {
+                    canvas.drawText("条码/二维码生成失败，备注: $safeNote", left, contentTop + scale(48f), textPaint)
+                }
+            }
+            "STAMP" -> {
+                if (qr != null && code != null) {
+                    val codeW = ((right - left) * 0.56f).toInt().coerceAtLeast(220)
+                    val codeBmp = Bitmap.createScaledBitmap(code, codeW, code.height, true)
+                    val codeX = left
+                    val codeY = contentTop + scale(24f)
+                    canvas.drawBitmap(codeBmp, codeX, codeY, null)
+                    val qrX = right - qr.width
+                    val qrY = contentTop + scale(6f)
+                    canvas.drawBitmap(qr, qrX, qrY, null)
+                    canvas.drawText("验", qrX - scale(24f), qrY + scale(26f), monoPaint)
+                    canvas.drawText(safeNote, left, codeY + codeBmp.height + scale(34f), monoPaint)
+                } else {
+                    canvas.drawText("条码/二维码生成失败，备注: $safeNote", left, contentTop + scale(48f), textPaint)
+                }
+            }
+            "HIDDEN" -> {
+                if (qr != null && code != null) {
+                    val qrX = left
+                    val qrY = contentTop
+                    canvas.drawBitmap(qr, qrX, qrY, null)
+                    val codeX = qrX + qr.width + scale(20f)
+                    val maxCodeW = (right - codeX).toInt().coerceAtLeast(120)
+                    val codeBmp = if (code.width > maxCodeW) Bitmap.createScaledBitmap(code, maxCodeW, code.height, true) else code
+                    val codeY = qrY + ((qr.height - codeBmp.height) / 2f).coerceAtLeast(0f)
+                    canvas.drawBitmap(codeBmp, codeX, codeY, null)
+                } else {
+                    canvas.drawText("条码/二维码生成失败", left, contentTop + scale(48f), textPaint)
+                }
+            }
+            else -> { // CLASSIC
+                if (qr != null && code != null) {
+                    val qrX = left
+                    val qrY = contentTop
+                    canvas.drawBitmap(qr, qrX, qrY, null)
+                    val codeX = qrX + qr.width + scale(20f)
+                    val maxCodeW = (right - codeX).toInt().coerceAtLeast(120)
+                    val codeBmp = if (code.width > maxCodeW) Bitmap.createScaledBitmap(code, maxCodeW, code.height, true) else code
+                    val codeY = qrY + ((qr.height - codeBmp.height) / 2f).coerceAtLeast(0f)
+                    canvas.drawBitmap(codeBmp, codeX, codeY, null)
+                    canvas.drawText(safeNote, left, qrY + qr.height + scale(34f), monoPaint)
+                } else {
+                    canvas.drawText("条码/二维码生成失败，备注: $safeNote", left, contentTop + scale(48f), textPaint)
+                }
+            }
+        }
+
+        canvas.drawLine(scale(40f), startY + scale(240f), width - scale(40f), startY + scale(240f), linePaint)
     }
 
     private fun queryStatsByMode(resolver: ContentResolver, start: Long, end: Long, s: AutoSettings): ChartStats {
@@ -517,19 +613,23 @@ object AutoWallpaperGenerator {
         }.getOrNull()
     }
 
-    private fun drawBarcodeDecor(canvas: Canvas, x: Float, y: Float, width: Float, height: Float, seedText: String, paint: Paint) {
-        val seed = seedText.hashCode().toLong()
-        var state = if (seed == 0L) 1L else kotlin.math.abs(seed)
-        var cursor = x
-        val end = x + width
-        while (cursor < end) {
-            state = (state * 1103515245 + 12345) and 0x7fffffff
-            val barW = (1 + (state % 5)).toFloat()
-            state = (state * 1103515245 + 12345) and 0x7fffffff
-            val gapW = (1 + (state % 4)).toFloat()
-            canvas.drawRect(cursor, y, (cursor + barW).coerceAtMost(end), y + height, paint)
-            cursor += barW + gapW
-        }
+    private fun buildCode128Bitmap(content: String, width: Int, height: Int): Bitmap? {
+        return runCatching {
+            val hints = hashMapOf<EncodeHintType, Any>(EncodeHintType.CHARACTER_SET to "UTF-8")
+            val payload = when {
+                content.isBlank() -> "EMPTY"
+                content.length > 160 -> content.take(160)
+                else -> content
+            }
+            val matrix = MultiFormatWriter().encode(payload, BarcodeFormat.CODE_128, width, height, hints)
+            val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            for (x in 0 until width) {
+                for (y in 0 until height) {
+                    bmp.setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
+                }
+            }
+            bmp
+        }.getOrNull()
     }
 
     private fun resolveTypeface(context: Context, spec: String, boldDefault: Boolean): Typeface {

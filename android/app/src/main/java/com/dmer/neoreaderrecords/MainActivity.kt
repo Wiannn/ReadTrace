@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var topNGroup: RadioGroup
     private lateinit var timeUnitGroup: RadioGroup
     private lateinit var footerModeGroup: RadioGroup
+    private lateinit var barcodeStyleGroup: RadioGroup
     private lateinit var chartStyleGroup: RadioGroup
     private lateinit var yAxisModeGroup: RadioGroup
     private lateinit var showPeakLabelCheck: CheckBox
@@ -134,6 +135,7 @@ class MainActivity : AppCompatActivity() {
     enum class ReadingFilterMode { ALL, READING_ONLY, FINISHED_ONLY }
     enum class ChartStyleMode { LINE, BAR }
     enum class YAxisMode { AUTO, FIXED }
+    enum class BarcodeStyleMode { CLASSIC, MINIMAL, TICKET, STAMP, HIDDEN }
 
     data class Settings(
         val includeUnread: Boolean,
@@ -153,6 +155,7 @@ class MainActivity : AppCompatActivity() {
         val receiptTitleSize: Float,
         val receiptBodySize: Float,
         val footerMode: String,
+        val barcodeStyleMode: BarcodeStyleMode,
         val noteText: String,
         val chartStyleMode: ChartStyleMode,
         val showPeakLabel: Boolean,
@@ -406,6 +409,20 @@ class MainActivity : AppCompatActivity() {
             hint = "备注文本 / 条码内容"
             setText(prefs.getString("note_text", "") ?: "")
         }
+        val barcodeStyleLabel = TextView(this).apply { text = "条码样式预设" }
+        val barcodeStyleHint = TextView(this).apply {
+            textSize = 12f
+            text = "样式说明：经典组合 / 极简长条 / 票据双码 / 印章角标 / 隐藏文本码。"
+        }
+        barcodeStyleGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            val saved = prefs.getString("barcode_style", BarcodeStyleMode.CLASSIC.name) ?: BarcodeStyleMode.CLASSIC.name
+            addView(RadioButton(context).apply { id = 3201; text = "经典组合（二维码+长条码+备注）"; isChecked = saved == BarcodeStyleMode.CLASSIC.name })
+            addView(RadioButton(context).apply { id = 3202; text = "极简长条（仅长条码）"; isChecked = saved == BarcodeStyleMode.MINIMAL.name })
+            addView(RadioButton(context).apply { id = 3203; text = "票据双码（二维码+长条码+LINK）"; isChecked = saved == BarcodeStyleMode.TICKET.name })
+            addView(RadioButton(context).apply { id = 3204; text = "印章角标（角落二维码+短条码）"; isChecked = saved == BarcodeStyleMode.STAMP.name })
+            addView(RadioButton(context).apply { id = 3205; text = "隐藏文本码（只显示码）"; isChecked = saved == BarcodeStyleMode.HIDDEN.name })
+        }
         val chartStyleLabel = TextView(this).apply { text = "图表样式" }
         val chartRuleHint = TextView(this).apply {
             textSize = 12f
@@ -553,6 +570,9 @@ class MainActivity : AppCompatActivity() {
         container.addView(footerLabel)
         container.addView(footerModeGroup)
         container.addView(noteInput)
+        container.addView(barcodeStyleLabel)
+        container.addView(barcodeStyleHint)
+        container.addView(barcodeStyleGroup)
         container.addView(titleFontLabel)
         container.addView(titleFontSpinner)
         container.addView(bodyFontLabel)
@@ -615,6 +635,9 @@ class MainActivity : AppCompatActivity() {
             if (!isInitializingUi) applySettingsPreview()
         }
         footerModeGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        barcodeStyleGroup.setOnCheckedChangeListener { _, _ ->
             if (!isInitializingUi) applySettingsPreview()
         }
         autoRefreshCheck.setOnCheckedChangeListener { _, _ ->
@@ -891,10 +914,17 @@ class MainActivity : AppCompatActivity() {
             3003 -> "BARCODE"
             else -> "NONE"
         }
+        val barcodeStyleMode = when (barcodeStyleGroup.checkedRadioButtonId) {
+            3202 -> BarcodeStyleMode.MINIMAL
+            3203 -> BarcodeStyleMode.TICKET
+            3204 -> BarcodeStyleMode.STAMP
+            3205 -> BarcodeStyleMode.HIDDEN
+            else -> BarcodeStyleMode.CLASSIC
+        }
         val noteText = noteInput.text.toString().trim()
         val titleFont = fontSpec(titleFontSpinner.selectedItem?.toString() ?: "SERIF_BOLD")
         val bodyFont = fontSpec(bodyFontSpinner.selectedItem?.toString() ?: "MONO")
-        return Settings(includeUnread, showChart, showProgressStatus, showAuthor, minDurationMinutes, topN, weekStart, weekEnd, periodMode, readingFilterMode, sourceMode, progressMode, timeUnit, receiptTitle, receiptTitleSize, receiptBodySize, footerMode, noteText, chartStyleMode, showPeakLabel, yAxisMode, yAxisFixedMaxMinutes, titleFont, bodyFont)
+        return Settings(includeUnread, showChart, showProgressStatus, showAuthor, minDurationMinutes, topN, weekStart, weekEnd, periodMode, readingFilterMode, sourceMode, progressMode, timeUnit, receiptTitle, receiptTitleSize, receiptBodySize, footerMode, barcodeStyleMode, noteText, chartStyleMode, showPeakLabel, yAxisMode, yAxisFixedMaxMinutes, titleFont, bodyFont)
     }
 
     private fun saveSettings(settings: Settings) {
@@ -917,6 +947,7 @@ class MainActivity : AppCompatActivity() {
             .putFloat("receipt_title_size", settings.receiptTitleSize)
             .putFloat("receipt_body_size", settings.receiptBodySize)
             .putString("footer_mode", settings.footerMode)
+            .putString("barcode_style", settings.barcodeStyleMode.name)
             .putString("note_text", settings.noteText)
             .putString("chart_style_mode", settings.chartStyleMode.name)
             .putBoolean("show_peak_label", settings.showPeakLabel)
