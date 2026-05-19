@@ -71,6 +71,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var weekEndText: TextView
     private lateinit var sourceGroup: RadioGroup
     private lateinit var periodGroup: RadioGroup
+    private lateinit var progressModeGroup: RadioGroup
     private lateinit var readingFilterGroup: RadioGroup
     private lateinit var topNGroup: RadioGroup
     private lateinit var timeUnitGroup: RadioGroup
@@ -79,6 +80,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var yAxisModeGroup: RadioGroup
     private lateinit var showPeakLabelCheck: CheckBox
     private lateinit var yAxisMaxInput: EditText
+    private lateinit var autoRefreshCheck: CheckBox
+    private lateinit var autoModeGroup: RadioGroup
+    private lateinit var autoDailyTimeInput: EditText
+    private lateinit var autoMinIntervalInput: EditText
+    private lateinit var autoModeHintText: TextView
     private lateinit var pickFontDirBtn: Button
     private lateinit var titleFontSpinner: Spinner
     private lateinit var bodyFontSpinner: Spinner
@@ -124,7 +130,7 @@ class MainActivity : AppCompatActivity() {
     data class BookItem(val title: String, val author: String?, val progress: String?, val status: Int, val path: String?)
 
     enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS }
-    enum class PeriodMode { TODAY, THIS_WEEK, LAST_WEEK, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
+    enum class PeriodMode { TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
     enum class ReadingFilterMode { ALL, READING_ONLY, FINISHED_ONLY }
     enum class ChartStyleMode { LINE, BAR }
     enum class YAxisMode { AUTO, FIXED }
@@ -141,6 +147,7 @@ class MainActivity : AppCompatActivity() {
         val periodMode: PeriodMode,
         val readingFilterMode: ReadingFilterMode,
         val sourceMode: DataSourceMode,
+        val progressMode: String,
         val timeUnit: String,
         val receiptTitle: String,
         val receiptTitleSize: Float,
@@ -303,6 +310,7 @@ class MainActivity : AppCompatActivity() {
             orientation = RadioGroup.VERTICAL
             val saved = prefs.getString("period_mode", PeriodMode.THIS_WEEK.name) ?: PeriodMode.THIS_WEEK.name
             addView(RadioButton(context).apply { id = 4000; text = "当天"; isChecked = saved == PeriodMode.TODAY.name })
+            addView(RadioButton(context).apply { id = 4006; text = "昨天"; isChecked = saved == PeriodMode.YESTERDAY.name })
             addView(RadioButton(context).apply { id = 4001; text = "本周"; isChecked = saved == PeriodMode.THIS_WEEK.name })
             addView(RadioButton(context).apply { id = 4002; text = "上周"; isChecked = saved == PeriodMode.LAST_WEEK.name })
             addView(RadioButton(context).apply { id = 4003; text = "最近7天"; isChecked = saved == PeriodMode.LAST_7_DAYS.name })
@@ -326,6 +334,13 @@ class MainActivity : AppCompatActivity() {
         showProgressStatusCheck = CheckBox(this).apply {
             text = "显示进度和状态行"
             isChecked = prefs.getBoolean("show_progress_status", true)
+        }
+        val progressModeLabel = TextView(this).apply { text = "进度显示方式" }
+        progressModeGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.HORIZONTAL
+            val saved = prefs.getString("progress_mode", "PAGES") ?: "PAGES"
+            addView(RadioButton(context).apply { id = 6101; text = "页数"; isChecked = saved == "PAGES" })
+            addView(RadioButton(context).apply { id = 6102; text = "百分比"; isChecked = saved == "PERCENT" })
         }
         showAuthorCheck = CheckBox(this).apply {
             text = "显示作者行（在进度行上方）"
@@ -392,6 +407,10 @@ class MainActivity : AppCompatActivity() {
             setText(prefs.getString("note_text", "") ?: "")
         }
         val chartStyleLabel = TextView(this).apply { text = "图表样式" }
+        val chartRuleHint = TextView(this).apply {
+            textSize = 12f
+            text = "图表横轴规则：当天/昨天=按小时；本周/上周/最近7天=按天；最近30天=按天；自定义<=14天按天，15-90天按周，>90天按月。"
+        }
         chartStyleGroup = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
             val saved = prefs.getString("chart_style_mode", ChartStyleMode.LINE.name) ?: ChartStyleMode.LINE.name
@@ -412,6 +431,33 @@ class MainActivity : AppCompatActivity() {
         yAxisMaxInput = EditText(this).apply {
             hint = "固定最大值(分钟)"
             setText(prefs.getInt("y_axis_fixed_max_minutes", 300).toString())
+        }
+
+        val autoSectionLabel = TextView(this).apply { text = "自动刷新（默认开启）" }
+        autoRefreshCheck = CheckBox(this).apply {
+            text = "启用自动刷新与自动覆盖保存"
+            isChecked = prefs.getBoolean(AutoRefreshConfig.KEY_AUTO_ENABLED, true)
+        }
+        autoModeGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            val saved = prefs.getString(AutoRefreshConfig.KEY_AUTO_MODE, AutoRefreshConfig.MODE_DAILY) ?: AutoRefreshConfig.MODE_DAILY
+            addView(RadioButton(context).apply { id = 8001; text = "每日定时一次（省电，推荐）"; isChecked = saved == AutoRefreshConfig.MODE_DAILY })
+            addView(RadioButton(context).apply { id = 8002; text = "熄屏触发（更实时，较耗电）"; isChecked = saved == AutoRefreshConfig.MODE_SCREEN_OFF })
+        }
+        autoDailyTimeInput = EditText(this).apply {
+            hint = "每日执行时间，例如 22:30"
+            setText(prefs.getString(AutoRefreshConfig.KEY_DAILY_TIME, "22:30") ?: "22:30")
+        }
+        autoMinIntervalInput = EditText(this).apply {
+            hint = "熄屏触发最小间隔(分钟, 1-240)"
+            setText(prefs.getInt(AutoRefreshConfig.KEY_SCREEN_OFF_MIN_INTERVAL, 3).toString())
+        }
+        autoModeHintText = TextView(this).apply {
+            textSize = 12f
+        }
+        val autoWarningText = TextView(this).apply {
+            text = "提示：熄屏触发会增加唤醒次数与耗电，墨水屏建议优先每日定时。"
+            textSize = 12f
         }
 
         val titleFontLabel = TextView(this).apply { text = "标题字体（系统字体）" }
@@ -475,6 +521,8 @@ class MainActivity : AppCompatActivity() {
         container.addView(bodySizeLabel)
         container.addView(bodySizeInput)
         container.addView(showProgressStatusCheck)
+        container.addView(progressModeLabel)
+        container.addView(progressModeGroup)
         container.addView(showAuthorCheck)
         container.addView(showChartCheck)
         container.addView(sourceLabel)
@@ -489,11 +537,19 @@ class MainActivity : AppCompatActivity() {
         container.addView(timeUnitLabel)
         container.addView(timeUnitGroup)
         container.addView(chartStyleLabel)
+        container.addView(chartRuleHint)
         container.addView(chartStyleGroup)
         container.addView(showPeakLabelCheck)
         container.addView(yAxisModeLabel)
         container.addView(yAxisModeGroup)
         container.addView(yAxisMaxInput)
+        container.addView(autoSectionLabel)
+        container.addView(autoRefreshCheck)
+        container.addView(autoModeGroup)
+        container.addView(autoDailyTimeInput)
+        container.addView(autoMinIntervalInput)
+        container.addView(autoModeHintText)
+        container.addView(autoWarningText)
         container.addView(footerLabel)
         container.addView(footerModeGroup)
         container.addView(noteInput)
@@ -511,6 +567,7 @@ class MainActivity : AppCompatActivity() {
         container.addView(generateButton)
         container.addView(statusText)
 
+        updateAutoRefreshHint()
         attachAutoRefreshListeners()
 
         scroll.addView(container)
@@ -542,6 +599,9 @@ class MainActivity : AppCompatActivity() {
         readingFilterGroup.setOnCheckedChangeListener { _, _ ->
             if (!isInitializingUi) applySettingsPreview()
         }
+        progressModeGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
         topNGroup.setOnCheckedChangeListener { _, _ ->
             if (!isInitializingUi) applySettingsPreview()
         }
@@ -555,6 +615,12 @@ class MainActivity : AppCompatActivity() {
             if (!isInitializingUi) applySettingsPreview()
         }
         footerModeGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        autoRefreshCheck.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        autoModeGroup.setOnCheckedChangeListener { _, _ ->
             if (!isInitializingUi) applySettingsPreview()
         }
         titleFontSpinner.setOnItemSelectedListener(SimpleItemSelectedListener { if (!isInitializingUi) applySettingsPreview() })
@@ -608,11 +674,26 @@ class MainActivity : AppCompatActivity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+        autoDailyTimeInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        autoMinIntervalInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
     }
 
     private fun applySettingsPreview() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
+        saveAndApplyAutoRefreshSettings()
         val (bmp, result) = renderWallpaperPreview(settings)
         previewBitmap = bmp
         statusText.text = "预览已更新（未写入文件）\n$result"
@@ -661,6 +742,7 @@ class MainActivity : AppCompatActivity() {
     private fun generateAndSaveFromCurrentSettings() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
+        saveAndApplyAutoRefreshSettings()
         val (bmp, result) = renderWallpaperPreview(settings)
         previewBitmap = bmp
         val saved = saveBitmapToPictures(bmp)
@@ -669,6 +751,44 @@ class MainActivity : AppCompatActivity() {
         refreshPreview()
         showPreviewPage()
         writeDebugLog("generated_saved")
+    }
+
+    private fun saveAndApplyAutoRefreshSettings() {
+        val isEnabled = autoRefreshCheck.isChecked
+        val mode = if (autoModeGroup.checkedRadioButtonId == 8002) AutoRefreshConfig.MODE_SCREEN_OFF else AutoRefreshConfig.MODE_DAILY
+        val dailyTime = normalizeDailyTime(autoDailyTimeInput.text.toString())
+        val minInterval = autoMinIntervalInput.text.toString().trim().toIntOrNull()?.coerceIn(1, 240) ?: 3
+        val prefs = getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(AutoRefreshConfig.KEY_AUTO_ENABLED, isEnabled)
+            .putString(AutoRefreshConfig.KEY_AUTO_MODE, mode)
+            .putString(AutoRefreshConfig.KEY_DAILY_TIME, dailyTime)
+            .putInt(AutoRefreshConfig.KEY_SCREEN_OFF_MIN_INTERVAL, minInterval)
+            .apply()
+        if (autoDailyTimeInput.text.toString() != dailyTime) {
+            autoDailyTimeInput.setText(dailyTime)
+            autoDailyTimeInput.setSelection(dailyTime.length)
+        }
+        updateAutoRefreshHint()
+        AutoRefreshScheduler.reschedule(this)
+        AutoRefreshRuntime.sync(this)
+        AutoRefreshLog.i(this, "auto settings updated: enabled=$isEnabled mode=$mode dailyTime=$dailyTime minInterval=$minInterval")
+    }
+
+    private fun updateAutoRefreshHint() {
+        val mode = if (::autoModeGroup.isInitialized && autoModeGroup.checkedRadioButtonId == 8002) "熄屏触发" else "每日定时"
+        autoModeHintText.text = if (::autoRefreshCheck.isInitialized && autoRefreshCheck.isChecked) {
+            "当前自动模式：$mode，熄屏最小间隔=${autoMinIntervalInput.text}"
+        } else {
+            "当前自动模式：已关闭"
+        }
+    }
+
+    private fun normalizeDailyTime(raw: String): String {
+        val m = Regex("""^\s*(\d{1,2}):(\d{1,2})\s*$""").find(raw)
+        val h = m?.groupValues?.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 23) ?: 22
+        val mm = m?.groupValues?.getOrNull(2)?.toIntOrNull()?.coerceIn(0, 59) ?: 30
+        return String.format(Locale.US, "%02d:%02d", h, mm)
     }
 
     private fun buildPreviewPage(): View {
@@ -728,6 +848,7 @@ class MainActivity : AppCompatActivity() {
         val weekEnd = selectedWeekEndYmd.ifBlank { currentWeekEndYmd() }
         val periodMode = when (periodGroup.checkedRadioButtonId) {
             4000 -> PeriodMode.TODAY
+            4006 -> PeriodMode.YESTERDAY
             4002 -> PeriodMode.LAST_WEEK
             4003 -> PeriodMode.LAST_7_DAYS
             4004 -> PeriodMode.LAST_30_DAYS
@@ -743,6 +864,10 @@ class MainActivity : AppCompatActivity() {
             1002 -> DataSourceMode.PATH_SESSION
             1003 -> DataSourceMode.METADATA_ACCESS
             else -> DataSourceMode.DURATION
+        }
+        val progressMode = when (progressModeGroup.checkedRadioButtonId) {
+            6102 -> "PERCENT"
+            else -> "PAGES"
         }
         val timeUnit = when (timeUnitGroup.checkedRadioButtonId) {
             2002 -> "MINUTE"
@@ -769,7 +894,7 @@ class MainActivity : AppCompatActivity() {
         val noteText = noteInput.text.toString().trim()
         val titleFont = fontSpec(titleFontSpinner.selectedItem?.toString() ?: "SERIF_BOLD")
         val bodyFont = fontSpec(bodyFontSpinner.selectedItem?.toString() ?: "MONO")
-        return Settings(includeUnread, showChart, showProgressStatus, showAuthor, minDurationMinutes, topN, weekStart, weekEnd, periodMode, readingFilterMode, sourceMode, timeUnit, receiptTitle, receiptTitleSize, receiptBodySize, footerMode, noteText, chartStyleMode, showPeakLabel, yAxisMode, yAxisFixedMaxMinutes, titleFont, bodyFont)
+        return Settings(includeUnread, showChart, showProgressStatus, showAuthor, minDurationMinutes, topN, weekStart, weekEnd, periodMode, readingFilterMode, sourceMode, progressMode, timeUnit, receiptTitle, receiptTitleSize, receiptBodySize, footerMode, noteText, chartStyleMode, showPeakLabel, yAxisMode, yAxisFixedMaxMinutes, titleFont, bodyFont)
     }
 
     private fun saveSettings(settings: Settings) {
@@ -786,6 +911,7 @@ class MainActivity : AppCompatActivity() {
             .putString("period_mode", settings.periodMode.name)
             .putString("reading_filter_mode", settings.readingFilterMode.name)
             .putString("source_mode", settings.sourceMode.name)
+            .putString("progress_mode", settings.progressMode)
             .putString("time_unit", settings.timeUnit)
             .putString("receipt_title", settings.receiptTitle)
             .putFloat("receipt_title_size", settings.receiptTitleSize)
@@ -801,402 +927,10 @@ class MainActivity : AppCompatActivity() {
             .apply()
     }
 
-    private data class WeekStats(val totalMs: Long, val perDay: LongArray)
-
     private fun renderWallpaperPreview(settings: Settings): Pair<Bitmap, String> {
-        val week = resolvePeriodRange(settings) ?: return "日期格式错误，请用 yyyy-MM-dd"
-            .let { Pair(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888), it) }
-        val topBooks = queryTopBooksInWeek(week.first, week.second, settings.topN, settings.includeUnread, settings.readingFilterMode)
-        val weekStats = queryWeekStatsByMode(week.first, week.second, settings)
-
-        val width = resources.displayMetrics.widthPixels.coerceAtLeast(1200)
-        val height = resources.displayMetrics.heightPixels.coerceAtLeast(1600)
-
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        canvas.drawColor(Color.WHITE)
-
-        drawReceiptWallpaper(canvas, width, height, week.first, week.second, weekStats, topBooks, settings)
-        val message = buildString {
-            append("已生成\n")
-            append("范围: ${fmt(week.first)} - ${fmt(week.second)}\n")
-            append("周期: ${settings.periodMode}\n")
-            append("口径: ${settings.sourceMode}\n")
-            append("阈值: >= ${settings.minDurationMinutes} 分钟\n")
-            append("TopN: ${settings.topN}\n")
-            append("包含未读: ${settings.includeUnread}\n")
-            append("周总时长: ")
-            append(formatDuration(weekStats.totalMs, settings.timeUnit))
-        }
-        return Pair(bmp, message)
-    }
-
-    private fun queryWeekStatsByMode(start: Long, end: Long, settings: Settings): WeekStats {
-        return when (settings.sourceMode) {
-            DataSourceMode.DURATION -> queryWeekDurationStats(start, end, settings.minDurationMinutes)
-            DataSourceMode.PATH_SESSION -> queryWeekPathSessionStats(start, end)
-            DataSourceMode.METADATA_ACCESS -> queryWeekMetadataAccessStats(start, end)
-        }
-    }
-
-    private fun queryWeekDurationStats(start: Long, end: Long, minDurationMinutes: Int): WeekStats {
-        val perDay = LongArray(7)
-        var total = 0L
-        val minMs = minDurationMinutes * 60L * 1000L
-
-        val projection = arrayOf("eventTime", "durationTime")
-        contentResolver.query(
-            statsUri,
-            projection,
-            "eventTime >= ? AND eventTime <= ? AND durationTime IS NOT NULL AND durationTime != '' AND durationTime != '0'",
-            arrayOf(start.toString(), end.toString()),
-            null
-        )?.use { c ->
-            while (c.moveToNext()) {
-                val event = c.getString(c.getColumnIndexOrThrow("eventTime"))?.toLongOrNull() ?: continue
-                val dur = c.getString(c.getColumnIndexOrThrow("durationTime"))?.toLongOrNull() ?: 0L
-                if (dur < minMs) continue
-                total += dur
-                val idx = bucketIndex(start, end, event)
-                if (idx in 0..6) perDay[idx] += dur
-            }
-        }
-        return WeekStats(total, perDay)
-    }
-
-    private fun queryWeekPathSessionStats(start: Long, end: Long): WeekStats {
-        val perDay = LongArray(7)
-        var total = 0L
-
-        val projection = arrayOf("eventTime")
-        contentResolver.query(
-            statsUri,
-            projection,
-            "eventTime >= ? AND eventTime <= ? AND path IS NOT NULL AND path != ''",
-            arrayOf(start.toString(), end.toString()),
-            null
-        )?.use { c ->
-            while (c.moveToNext()) {
-                val event = c.getString(c.getColumnIndexOrThrow("eventTime"))?.toLongOrNull() ?: continue
-                total += 60_000L
-                val idx = bucketIndex(start, end, event)
-                if (idx in 0..6) perDay[idx] += 60_000L
-            }
-        }
-        return WeekStats(total, perDay)
-    }
-
-    private fun queryWeekMetadataAccessStats(start: Long, end: Long): WeekStats {
-        val perDay = LongArray(7)
-        var total = 0L
-
-        val projection = arrayOf("lastAccess")
-        contentResolver.query(
-            metadataUri,
-            projection,
-            "lastAccess >= ? AND lastAccess <= ?",
-            arrayOf(start.toString(), end.toString()),
-            null
-        )?.use { c ->
-            while (c.moveToNext()) {
-                val event = c.getString(c.getColumnIndexOrThrow("lastAccess"))?.toLongOrNull() ?: continue
-                total += 60_000L
-                val idx = bucketIndex(start, end, event)
-                if (idx in 0..6) perDay[idx] += 60_000L
-            }
-        }
-        return WeekStats(total, perDay)
-    }
-
-    private fun bucketIndex(start: Long, end: Long, event: Long): Int {
-        if (event < start || event > end) return -1
-        val span = (end - start + 1).coerceAtLeast(1L)
-        val offset = (event - start).coerceAtLeast(0L)
-        val idx = ((offset * 7L) / span).toInt()
-        return idx.coerceIn(0, 6)
-    }
-
-    private fun queryTopBooksInWeek(start: Long, end: Long, limit: Int, includeUnread: Boolean, filter: ReadingFilterMode): List<BookItem> {
-        val result = mutableListOf<BookItem>()
-        val richProjection = arrayOf(
-            "title", "authors", "progress", "readingStatus", "nativeAbsolutePath", "lastAccess"
-        )
-        val baseProjection = arrayOf("title", "progress", "readingStatus", "nativeAbsolutePath", "lastAccess")
-
-        val selection = buildString {
-            append("lastAccess >= ? AND lastAccess <= ?")
-            if (!includeUnread) append(" AND (readingStatus = 1 OR readingStatus = 2)")
-            when (filter) {
-                ReadingFilterMode.READING_ONLY -> append(" AND readingStatus = 1")
-                ReadingFilterMode.FINISHED_ONLY -> append(" AND readingStatus = 2")
-                else -> {}
-            }
-        }
-
-        fun fillFromCursor(c: android.database.Cursor) {
-            val cols = c.columnNames?.joinToString(",") ?: "<null>"
-            val sampleAuthors = mutableListOf<String>()
-            val titleIdx = c.getColumnIndex("title")
-            val authorsIdx = c.getColumnIndex("authors")
-            val progressIdx = c.getColumnIndex("progress")
-            val statusIdx = c.getColumnIndex("readingStatus")
-            val pathIdx = c.getColumnIndex("nativeAbsolutePath")
-            while (c.moveToNext() && result.size < limit) {
-                val title = if (titleIdx >= 0) c.getString(titleIdx) ?: "<未知书名>" else "<未知书名>"
-                val authors = if (authorsIdx >= 0) c.getString(authorsIdx) else null
-                val authorText = authors?.trim()?.ifBlank { null }
-                if (sampleAuthors.size < 3) {
-                    sampleAuthors.add("authors=${authors ?: "-"}")
-                }
-                val progress = if (progressIdx >= 0) c.getString(progressIdx) else null
-                val status = if (statusIdx >= 0) c.getString(statusIdx)?.toIntOrNull() ?: 0 else 0
-                val path = if (pathIdx >= 0) c.getString(pathIdx) else null
-                result.add(BookItem(title, authorText, progress, status, path))
-            }
-            metadataDebugReport = "columns=$cols | authorSamples=${sampleAuthors.joinToString(" || ")}"
-        }
-
-        try {
-            contentResolver.query(
-                metadataUri,
-                richProjection,
-                selection,
-                arrayOf(start.toString(), end.toString()),
-                "readingStatus DESC, lastAccess DESC"
-            )?.use { fillFromCursor(it) }
-        } catch (_: Exception) {
-            contentResolver.query(
-                metadataUri,
-                baseProjection,
-                selection,
-                arrayOf(start.toString(), end.toString()),
-                "readingStatus DESC, lastAccess DESC"
-            )?.use { fillFromCursor(it) }
-        }
-        metadataRowsDebugReport = dumpMetadataRows(start, end, 4)
-        return result
-    }
-
-    private fun dumpMetadataRows(start: Long, end: Long, sampleRows: Int): String {
-        return try {
-            val sb = StringBuilder()
-            contentResolver.query(
-                metadataUri,
-                null,
-                "lastAccess >= ? AND lastAccess <= ?",
-                arrayOf(start.toString(), end.toString()),
-                "lastAccess DESC"
-            )?.use { c ->
-                val cols = c.columnNames ?: emptyArray()
-                sb.append("metaColumns(").append(cols.size).append(")=").append(cols.joinToString(",")).append('\n')
-                var row = 0
-                while (c.moveToNext() && row < sampleRows) {
-                    sb.append("metaRow[").append(row).append("]: ")
-                    val pairs = mutableListOf<String>()
-                    for (name in cols) {
-                        val idx = c.getColumnIndex(name)
-                        if (idx >= 0) {
-                            val v = c.getString(idx)
-                            pairs.add("$name=${v ?: "<null>"}")
-                        }
-                    }
-                    sb.append(pairs.joinToString(" | ")).append('\n')
-                    row++
-                }
-                if (row == 0) sb.append("metaRow=<none>\n")
-            } ?: sb.append("metaQuery=<null cursor>\n")
-            sb.toString()
-        } catch (e: Exception) {
-            "metaDumpError=${e.javaClass.simpleName}:${e.message}"
-        }
-    }
-
-    private fun formatDuration(ms: Long, unit: String): String {
-        return if (unit == "MINUTE") {
-            String.format(Locale.US, "%.0f分钟", ms / 60000.0)
-        } else {
-            String.format(Locale.US, "%.2f小时", ms / 3600000.0)
-        }
-    }
-
-    private fun drawReceiptWallpaper(
-        canvas: Canvas,
-        w: Int,
-        h: Int,
-        weekStart: Long,
-        weekEnd: Long,
-        stats: WeekStats,
-        books: List<BookItem>,
-        settings: Settings
-    ) {
-        // Global adaptive scale: keep layout proportion while fitting all enabled sections.
-        val bookLines = books.size * (80f + (if (settings.showAuthor) 42f else 0f) + (if (settings.showProgressStatus) 50f else 0f))
-        val headerBlock = 110f + 30f + 250f + 48f + 28f
-        val summaryBlock = 30f + 60f + 50f
-        val chartBlock = if (settings.showChart) 260f else 0f
-        val hasFooter = settings.footerMode != "NONE" && settings.noteText.isNotBlank()
-        val footerBlock = if (!hasFooter) 0f else if (settings.footerMode == "BARCODE") 280f else 130f
-        val requiredH = headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
-        val fitScale = (h.toFloat() - 40f) / requiredH
-        val gs = fitScale.coerceIn(0.52f, 1f)
-        fun s(v: Float): Float = v * gs
-
-        val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-        val titleFace = resolveTypeface(settings.titleFont, true)
-        val bodyFace = resolveTypeface(settings.bodyFont, false)
-        val titlePaint = Paint(black).apply { textSize = s(settings.receiptTitleSize); typeface = titleFace }
-        val h1 = Paint(black).apply { textSize = s((settings.receiptBodySize * 1.35f).coerceIn(24f, 90f)); typeface = Typeface.create(bodyFace, Typeface.BOLD) }
-        val text = Paint(black).apply { textSize = s(settings.receiptBodySize); typeface = bodyFace }
-        val mono = Paint(black).apply { textSize = s((settings.receiptBodySize * 0.88f).coerceIn(16f, 56f)); typeface = bodyFace }
-        val line = Paint(black).apply { strokeWidth = s(3f) }
-
-        var y = s(110f)
-        canvas.drawText(shortTitle(settings.receiptTitle, 12), w - s(360f), y, titlePaint)
-
-        y += s(30f)
-        canvas.drawText("单号: ${SimpleDateFormat("MMdd", Locale.US).format(Date())}", s(60f), y + s(40f), h1)
-        canvas.drawText("操作编号: ${System.currentTimeMillis().toString().takeLast(6)}", s(60f), y + s(95f), text)
-        canvas.drawText("时间: ${fmt(weekStart)} - ${fmt(weekEnd)}", s(60f), y + s(145f), text)
-        canvas.drawText("设备: Onyx Leaf5", s(60f), y + s(195f), text)
-
-        canvas.drawText("时长: ${formatDuration(stats.totalMs, settings.timeUnit)}", w - s(520f), y + s(145f), h1)
-        canvas.drawText("书籍: ${books.size}", w - s(520f), y + s(195f), text)
-
-        y += s(250f)
-        canvas.drawLine(s(40f), y, w - s(40f), y, line)
-        y += s(48f)
-        canvas.drawText("品类", s(60f), y, text)
-        canvas.drawText("数量", w - s(260f), y, text)
-        canvas.drawText("单位", w - s(140f), y, text)
-
-        y += s(28f)
-        canvas.drawLine(s(40f), y, w - s(40f), y, line)
-
-        books.forEachIndexed { idx, b ->
-            y += s(80f)
-            canvas.drawText("NO.${(idx + 1).toString().padStart(2, '0')}", s(60f), y, h1)
-            canvas.drawText(shortTitle(b.title, 16), s(260f), y, h1)
-            canvas.drawText("1", w - s(260f), y, h1)
-            canvas.drawText("本", w - s(140f), y, h1)
-            if (settings.showAuthor) {
-                y += s(42f)
-                canvas.drawText("作者:${shortTitle(b.author ?: "未知", 20)}", s(260f), y, mono)
-            }
-            if (settings.showProgressStatus) {
-                y += s(50f)
-                val st = when (b.status) { 2 -> "已读完"; 1 -> "阅读中"; else -> "未读" }
-                canvas.drawText("进度:${b.progress ?: "-"}  状态:$st", s(260f), y, mono)
-            }
-        }
-
-        y += s(30f)
-        canvas.drawLine(s(40f), y, w - s(40f), y, line)
-        y += s(60f)
-        canvas.drawText("周日均: ${String.format(Locale.US, "%.0f分钟", stats.totalMs / 7.0 / 60000.0)}", s(60f), y, h1)
-        canvas.drawText("本周合计: ${formatDuration(stats.totalMs, settings.timeUnit)}", w - s(560f), y, h1)
-
-        y += s(50f)
-        val footerReserved = if (!hasFooter) 0f else if (settings.footerMode == "BARCODE") s(260f) else s(120f)
-        val bottomSafe = (h - s(56f)).toFloat()
-        val availableChartH = ((bottomSafe - footerReserved - s(24f)) - y).coerceAtLeast(s(70f))
-        val maxChartBottom = y + availableChartH
-        var chartBottomUsed = y
-        if (settings.showChart) {
-        val days = arrayOf("日", "一", "二", "三", "四", "五", "六")
-        val chartLeft = s(80f)
-        val chartRight = (w - s(80f)).toFloat()
-        val chartTop = y
-        val desiredChartH = s(220f)
-        val chartBottom = (chartTop + desiredChartH).coerceAtMost(maxChartBottom)
-        chartBottomUsed = chartBottom
-        val autoMax = (stats.perDay.maxOrNull() ?: 1L).toFloat().coerceAtLeast(1f)
-        val max = if (settings.yAxisMode == YAxisMode.FIXED) (settings.yAxisFixedMaxMinutes * 60000f).coerceAtLeast(1f) else autoMax
-        val peakIdx = stats.perDay.indices.maxByOrNull { stats.perDay[it] } ?: 0
-        canvas.drawLine(chartLeft, chartBottom, chartRight, chartBottom, line)
-        canvas.drawLine(chartLeft, chartTop, chartLeft, chartBottom, line)
-        var prevX = 0f
-        var prevY = 0f
-        for (i in 0..6) {
-            val x = chartLeft + i * (chartRight - chartLeft) / 6f
-            val yv = chartBottom - ((stats.perDay[i] / max) * (chartBottom - chartTop))
-            if (settings.chartStyleMode == ChartStyleMode.BAR) {
-                val bw = s(24f)
-                canvas.drawRect(x - bw / 2f, yv, x + bw / 2f, chartBottom, black)
-            } else {
-                canvas.drawCircle(x, yv, s(5f), black)
-                if (i > 0) canvas.drawLine(prevX, prevY, x, yv, line)
-            }
-            canvas.drawText("周${days[i]}", x - s(22f), chartBottom + s(42f), mono)
-            if (settings.showPeakLabel && i == peakIdx) {
-                canvas.drawText(String.format(Locale.US, "%.0f分", stats.perDay[i] / 60000.0), x - s(28f), yv - s(14f), mono)
-            }
-            prevX = x
-            prevY = yv
-        }
-            y = chartBottom + s(56f)
-        }
-
-        if (hasFooter) {
-            val baseY = if (settings.showChart) (chartBottomUsed + s(64f)) else (y + s(16f))
-            canvas.drawLine(s(40f), baseY, w - s(40f), baseY, line)
-            barcodeDebugReport = "footer:has=true mode=${settings.footerMode} baseY=$baseY chartBottom=$chartBottomUsed bottomSafe=$bottomSafe reserved=$footerReserved noteLen=${settings.noteText.length}"
-            if (settings.footerMode == "NOTE") {
-                canvas.drawText("备注: ${shortTitle(settings.noteText, 40)}", s(60f), baseY + s(58f), text)
-            } else if (settings.footerMode == "BARCODE") {
-                val qr = buildQrBitmap(settings.noteText, s(168f).toInt().coerceAtLeast(120))
-                if (qr != null) {
-                    val qrX = s(60f)
-                    val qrY = baseY + s(18f)
-                    canvas.drawBitmap(qr, qrX, qrY, null)
-                    val decorX = qrX + qr.width + s(24f)
-                    val decorY = qrY + s(10f)
-                    val decorW = (w - decorX - s(60f)).coerceAtLeast(s(220f))
-                    val decorH = (qr.height - s(20f)).toFloat().coerceAtLeast(s(60f))
-                    drawBarcodeDecor(canvas, decorX, decorY, decorW, decorH, settings.noteText, black)
-                    val textY = qrY + qr.height + s(34f)
-                    canvas.drawText(shortTitle(settings.noteText, 36), qrX, textY, mono)
-                    barcodeDebugReport = "$barcodeDebugReport | qrDraw=x=$qrX y=$qrY s=${qr.width} decor=x=$decorX y=$decorY w=$decorW h=$decorH textY=$textY"
-                } else {
-                    canvas.drawText("二维码生成失败，备注: ${shortTitle(settings.noteText, 36)}", s(60f), baseY + s(58f), text)
-                }
-            }
-        } else {
-            barcodeDebugReport = "footer:has=false mode=${settings.footerMode} chartBottom=$chartBottomUsed bottomSafe=$bottomSafe reserved=$footerReserved noteLen=${settings.noteText.length}"
-        }
-    }
-
-    private fun buildQrBitmap(content: String, size: Int): Bitmap? {
-        return try {
-            val hints = hashMapOf<EncodeHintType, Any>(EncodeHintType.CHARACTER_SET to "UTF-8")
-            val compact = if (content.length > 120) content.take(120) else content
-            val matrix: BitMatrix = MultiFormatWriter().encode(compact, BarcodeFormat.QR_CODE, size, size, hints)
-            val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-            for (x in 0 until size) {
-                for (y in 0 until size) {
-                    bmp.setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
-                }
-            }
-            barcodeDebugReport = "$barcodeDebugReport | qr=QR_CODE ok contentLen=${content.length} usedLen=${compact.length} size=${size}x${size}"
-            bmp
-        } catch (e: Exception) {
-            barcodeDebugReport = "$barcodeDebugReport | qr=QR_CODE fail=${e.javaClass.simpleName}:${e.message}"
-            null
-        }
-    }
-
-    private fun drawBarcodeDecor(canvas: Canvas, x: Float, y: Float, width: Float, height: Float, seedText: String, paint: Paint) {
-        val seed = seedText.hashCode().toLong()
-        var state = if (seed == 0L) 1L else kotlin.math.abs(seed)
-        var cursor = x
-        val end = x + width
-        while (cursor < end) {
-            state = (state * 1103515245 + 12345) and 0x7fffffff
-            val barW = (1 + (state % 5)).toFloat()
-            state = (state * 1103515245 + 12345) and 0x7fffffff
-            val gapW = (1 + (state % 4)).toFloat()
-            canvas.drawRect(cursor, y, (cursor + barW).coerceAtMost(end), y + height, paint)
-            cursor += barW + gapW
-        }
+        val preview = AutoWallpaperGenerator.buildPreviewFromPrefs(this)
+            ?: return "日期格式错误，请用 yyyy-MM-dd".let { Pair(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888), it) }
+        return Pair(preview.bitmap, "已生成\n${preview.summary}")
     }
 
     private fun parseWeek(startYmd: String): Pair<Long, Long>? {
@@ -1232,49 +966,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun resolvePeriodRange(settings: Settings): Pair<Long, Long>? {
-        val cal = Calendar.getInstance(TimeZone.getDefault())
-        return when (settings.periodMode) {
-            PeriodMode.TODAY -> {
-                val c = Calendar.getInstance(TimeZone.getDefault())
-                c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
-                val start = c.timeInMillis
-                c.set(Calendar.HOUR_OF_DAY, 23); c.set(Calendar.MINUTE, 59); c.set(Calendar.SECOND, 59); c.set(Calendar.MILLISECOND, 999)
-                start to c.timeInMillis
-            }
-            PeriodMode.THIS_WEEK -> parseWeek(currentWeekStartYmd())
-            PeriodMode.LAST_WEEK -> {
-                val c = Calendar.getInstance(TimeZone.getDefault())
-                parseYmd(currentWeekStartYmd())?.let { c.timeInMillis = it } ?: return null
-                c.add(Calendar.DAY_OF_MONTH, -7)
-                parseWeek(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(c.timeInMillis)))
-            }
-            PeriodMode.LAST_7_DAYS -> {
-                cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59); cal.set(Calendar.MILLISECOND, 999)
-                val end = cal.timeInMillis
-                cal.add(Calendar.DAY_OF_MONTH, -6)
-                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
-                cal.timeInMillis to end
-            }
-            PeriodMode.LAST_30_DAYS -> {
-                cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59); cal.set(Calendar.MILLISECOND, 999)
-                val end = cal.timeInMillis
-                cal.add(Calendar.DAY_OF_MONTH, -29)
-                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
-                cal.timeInMillis to end
-            }
-            PeriodMode.CUSTOM -> {
-                val s = parseYmd(settings.weekStartYmd) ?: return null
-                val e = parseYmd(settings.weekEndYmd) ?: return null
-                val sc = Calendar.getInstance(TimeZone.getDefault()); sc.timeInMillis = s
-                sc.set(Calendar.HOUR_OF_DAY, 0); sc.set(Calendar.MINUTE, 0); sc.set(Calendar.SECOND, 0); sc.set(Calendar.MILLISECOND, 0)
-                val ec = Calendar.getInstance(TimeZone.getDefault()); ec.timeInMillis = e
-                ec.set(Calendar.HOUR_OF_DAY, 23); ec.set(Calendar.MINUTE, 59); ec.set(Calendar.SECOND, 59); ec.set(Calendar.MILLISECOND, 999)
-                if (sc.timeInMillis > ec.timeInMillis) null else (sc.timeInMillis to ec.timeInMillis)
-            }
-        }
-    }
-
     private fun currentWeekStartYmd(): String {
         val cal = Calendar.getInstance(TimeZone.getDefault())
         cal.firstDayOfWeek = Calendar.SUNDAY
@@ -1289,10 +980,6 @@ class MainActivity : AppCompatActivity() {
         c.add(Calendar.DAY_OF_MONTH, 6)
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(c.timeInMillis))
     }
-
-    private fun fmt(ts: Long): String = SimpleDateFormat("yyyy.MM.dd", Locale.US).format(Date(ts))
-
-    private fun shortTitle(s: String, max: Int): String = if (s.length <= max) s else s.take(max - 1) + "…"
 
     private fun loadSystemFonts(): List<String> {
         val result = mutableListOf("SERIF_BOLD", "SANS", "MONO")
@@ -1345,27 +1032,6 @@ class MainActivity : AppCompatActivity() {
         return result.distinct()
     }
 
-    private fun resolveTypeface(spec: String, boldDefault: Boolean): Typeface {
-        return when (spec) {
-            "SERIF_BOLD" -> Typeface.create(Typeface.SERIF, Typeface.BOLD)
-            "SANS" -> Typeface.create(Typeface.SANS_SERIF, if (boldDefault) Typeface.BOLD else Typeface.NORMAL)
-            "MONO" -> Typeface.create(Typeface.MONOSPACE, if (boldDefault) Typeface.BOLD else Typeface.NORMAL)
-            else -> {
-                try {
-                    if (spec.startsWith("content://")) {
-                        contentResolver.openFileDescriptor(Uri.parse(spec), "r")?.use { pfd ->
-                            Typeface.Builder(pfd.fileDescriptor).build()
-                        } ?: Typeface.create(Typeface.SANS_SERIF, if (boldDefault) Typeface.BOLD else Typeface.NORMAL)
-                    } else {
-                        Typeface.createFromFile(spec)
-                    }
-                } catch (_: Exception) {
-                    Typeface.create(Typeface.SANS_SERIF, if (boldDefault) Typeface.BOLD else Typeface.NORMAL)
-                }
-            }
-        }
-    }
-
     private fun saveBitmapToPictures(bitmap: Bitmap): String {
         val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "NeoReader")
         if (!dir.exists()) dir.mkdirs()
@@ -1392,6 +1058,7 @@ class MainActivity : AppCompatActivity() {
                     .append(", minDuration=").append(s.minDurationMinutes.toString())
                     .append(", topN=").append(s.topN.toString())
                     .append(", sourceMode=").append(s.sourceMode.name)
+                    .append(", progressMode=").append(s.progressMode)
                     .append(", timeUnit=").append(s.timeUnit)
                     .append(", receiptTitle=").append(s.receiptTitle)
                     .append(", receiptTitleSize=").append(s.receiptTitleSize.toString())
