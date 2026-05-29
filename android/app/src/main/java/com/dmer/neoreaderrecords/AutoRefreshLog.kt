@@ -10,6 +10,8 @@ import java.util.Locale
 
 object AutoRefreshLog {
     private const val LOG_NAME = "neoreader_auto_refresh_log.txt"
+    private const val MAX_LOG_BYTES = 1_024 * 1_024L
+    private const val MAX_BACKUP_FILES = 3
     private val lock = Any()
 
     fun i(context: Context, msg: String) {
@@ -40,6 +42,7 @@ object AutoRefreshLog {
     }
 
     private fun appendLine(file: File, line: String) {
+        rotateIfNeeded(file)
         RandomAccessFile(file, "rw").use { raf ->
             raf.channel.use { ch ->
                 ch.lock().use {
@@ -47,6 +50,24 @@ object AutoRefreshLog {
                     raf.write(line.toByteArray(Charsets.UTF_8))
                 }
             }
+        }
+    }
+
+    private fun rotateIfNeeded(file: File) {
+        if (file.exists() && file.length() < MAX_LOG_BYTES) return
+        for (i in MAX_BACKUP_FILES downTo 1) {
+            val src = File(file.parentFile, "$LOG_NAME.$i")
+            val dst = File(file.parentFile, "$LOG_NAME.${i + 1}")
+            if (src.exists()) {
+                if (i == MAX_BACKUP_FILES) {
+                    src.delete()
+                } else {
+                    src.renameTo(dst)
+                }
+            }
+        }
+        if (file.exists()) {
+            file.renameTo(File(file.parentFile, "$LOG_NAME.1"))
         }
     }
 
