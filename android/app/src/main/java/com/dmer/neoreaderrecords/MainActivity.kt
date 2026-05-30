@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var autoDailyTimeInput: EditText
     private lateinit var autoMinIntervalInput: EditText
     private lateinit var autoModeHintText: TextView
+    private lateinit var autoStateText: TextView
     private lateinit var pickFontDirBtn: Button
     private lateinit var titleFontSpinner: Spinner
     private lateinit var bodyFontSpinner: Spinner
@@ -205,6 +206,7 @@ class MainActivity : AppCompatActivity() {
         if (!isInitializingUi) {
             validateFontTreePermission()
             reloadFontsFromSources()
+            updateAutoRuntimeState()
             writeDebugLog("onResume_rescan")
         }
     }
@@ -665,6 +667,10 @@ class MainActivity : AppCompatActivity() {
         autoModeHintText = TextView(this).apply {
             textSize = 12f
         }
+        autoStateText = TextView(this).apply {
+            textSize = 12f
+            setTextColor(Color.DKGRAY)
+        }
         val autoWarningText = TextView(this).apply {
             text = "提示：熄屏触发会增加唤醒次数与耗电；NeoReader 常在退出当前书籍/会话落库后才更新元数据，所以可能出现“本次锁屏仍是旧封面、下次锁屏生效”的现象。"
             textSize = 12f
@@ -816,7 +822,7 @@ class MainActivity : AppCompatActivity() {
         })
         val autoMinIntervalControl = numberControl("熄屏最小间隔(分钟)", autoMinIntervalInput, 1, 240)
         secAuto.addView(autoSectionLabel); secAuto.addView(autoRefreshCheck); secAuto.addView(autoModeGroup); secAuto.addView(autoDailyTimeInput)
-        secAuto.addView(autoMinIntervalControl); secAuto.addView(autoModeHintText); secAuto.addView(autoWarningText); container.addView(secAutoBox)
+        secAuto.addView(autoMinIntervalControl); secAuto.addView(autoModeHintText); secAuto.addView(autoStateText); secAuto.addView(autoWarningText); container.addView(secAutoBox)
 
         fun updateConditionalVisibility() {
             val showChart = showChartCheck.isChecked
@@ -847,6 +853,7 @@ class MainActivity : AppCompatActivity() {
             autoDailyTimeInput.visibility = if (autoEnabled && autoModeGroup.checkedRadioButtonId == 8001) View.VISIBLE else View.GONE
             autoMinIntervalControl.visibility = if (autoEnabled && autoModeGroup.checkedRadioButtonId == 8002) View.VISIBLE else View.GONE
             autoModeHintText.visibility = if (autoEnabled) View.VISIBLE else View.GONE
+            autoStateText.visibility = if (autoEnabled) View.VISIBLE else View.GONE
             autoWarningText.visibility = if (autoEnabled) View.VISIBLE else View.GONE
 
             serialCustomInput.visibility = if (serialModeGroup.checkedRadioButtonId == 2013) View.VISIBLE else View.GONE
@@ -866,6 +873,7 @@ class MainActivity : AppCompatActivity() {
         container.addView(statusText)
 
         updateAutoRefreshHint()
+        updateAutoRuntimeState()
         attachAutoRefreshListeners()
 
         scroll.addView(container)
@@ -1089,6 +1097,7 @@ class MainActivity : AppCompatActivity() {
             autoDailyTimeInput.setSelection(dailyTime.length)
         }
         updateAutoRefreshHint()
+        updateAutoRuntimeState()
         AutoRefreshScheduler.reschedule(this)
         AutoRefreshRuntime.sync(this)
         AutoRefreshLog.i(this, "auto settings updated: enabled=$isEnabled mode=$mode dailyTime=$dailyTime minInterval=$minInterval")
@@ -1101,6 +1110,38 @@ class MainActivity : AppCompatActivity() {
         } else {
             "当前自动模式：已关闭"
         }
+    }
+
+    private fun updateAutoRuntimeState() {
+        if (!::autoStateText.isInitialized) return
+        val p = getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        val enabled = p.getBoolean(AutoRefreshConfig.KEY_AUTO_ENABLED, true)
+        val mode = p.getString(AutoRefreshConfig.KEY_AUTO_MODE, AutoRefreshConfig.MODE_DAILY) ?: AutoRefreshConfig.MODE_DAILY
+        val dailyTime = p.getString(AutoRefreshConfig.KEY_DAILY_TIME, "22:30") ?: "22:30"
+        val minInterval = p.getInt(AutoRefreshConfig.KEY_SCREEN_OFF_MIN_INTERVAL, 3).coerceIn(1, 240)
+        val lastMs = p.getLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, 0L)
+        val lastReasonRaw = p.getString(AutoRefreshConfig.KEY_LAST_REASON, "") ?: ""
+        val lastReason = when (lastReasonRaw) {
+            "screen_off" -> "熄屏触发"
+            "screen_on_prewarm" -> "亮屏预热"
+            "book_content_changed" -> "内容变化"
+            "daily_alarm" -> "每日定时"
+            "" -> "暂无"
+            else -> lastReasonRaw
+        }
+        val lastTime = if (lastMs > 0L) {
+            SimpleDateFormat("MM-dd HH:mm:ss", Locale.US).format(Date(lastMs))
+        } else {
+            "暂无"
+        }
+        val runtimeHint = if (!enabled) {
+            "自动已关闭"
+        } else if (mode == AutoRefreshConfig.MODE_SCREEN_OFF) {
+            "熄屏监听应运行（前台服务）"
+        } else {
+            "按每日定时运行（$dailyTime）"
+        }
+        autoStateText.text = "自动状态：$runtimeHint\n最近触发：$lastTime（$lastReason）\n当前参数：模式=$mode，定时=$dailyTime，熄屏间隔=${minInterval}分钟"
     }
 
     private fun normalizeDailyTime(raw: String): String {

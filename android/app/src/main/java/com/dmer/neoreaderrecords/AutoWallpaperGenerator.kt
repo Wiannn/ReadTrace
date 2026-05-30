@@ -73,6 +73,16 @@ object AutoWallpaperGenerator {
 
     data class PreviewResult(val bitmap: Bitmap, val summary: String)
     private data class FileCoverProbe(val bitmap: Bitmap?, val reason: String)
+    private data class CoverProbeTrace(
+        var rowsScanned: Int = 0,
+        var columnCandidateCount: Int = 0,
+        var columnDecodeAttempts: Int = 0,
+        var md5CacheAttempts: Int = 0,
+        var structuredSpecAttempts: Int = 0,
+        var internalCacheAttempts: Int = 0,
+        var fileFallbackAttempts: Int = 0,
+        var fallbackMissReasons: MutableMap<String, Int> = linkedMapOf()
+    )
 
     fun generateAndSave(context: Context, reason: String): Boolean {
         AutoRefreshLog.i(context, "Generator start reason=$reason")
@@ -115,10 +125,13 @@ object AutoWallpaperGenerator {
     }
 
     private fun tryBuildCoverWallpaper(context: Context, s: AutoSettings, sourceMark: String): PreviewResult? {
+        val startedAt = System.currentTimeMillis()
+        val trace = CoverProbeTrace()
         val cursor = context.contentResolver.query(metadataUri, null, null, null, "lastAccess DESC") ?: return null
         cursor.use { c ->
             if (!c.moveToFirst()) {
                 AutoRefreshLog.i(context, "cover mode: metadata empty")
+                logCoverProbeSummary(context, startedAt, "miss:metadata_empty", null, trace)
                 return null
             }
             AutoRefreshLog.i(context, "cover mode: metadata columns=${c.columnNames.joinToString(",")}")
@@ -127,10 +140,9 @@ object AutoWallpaperGenerator {
                 "bookCoverPath", "frontCoverPath", "coverUrl", "cover_url"
             )
             var row = 0
-            var candidateCount = 0
-            var fallbackTried = 0
             do {
                 row++
+                trace.rowsScanned = row
                 val title = readColString(c, "title") ?: "未知书名"
                 val readingStatus = readColString(c, "readingStatus") ?: "?"
                 val nativePath = readColString(c, "nativeAbsolutePath") ?: ""
@@ -140,12 +152,14 @@ object AutoWallpaperGenerator {
                 )
                 for (col in coverColumns) {
                     readColString(c, col)?.let { v ->
-                        candidateCount++
+                        trace.columnCandidateCount++
                         AutoRefreshLog.i(context, "cover mode row=$row candidate $col=${v.take(120)}")
                     }
+                    trace.columnDecodeAttempts++
                     val bmp = readBitmapFromColumn(context, c, col)
                     if (bmp != null) {
                         AutoRefreshLog.i(context, "cover mode hit row=$row column=$col title=$title w=${bmp.width} h=${bmp.height}")
+                        logCoverProbeSummary(context, startedAt, "hit:column:$col", title, trace)
                         return PreviewResult(renderCoverWallpaper(context, bmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title col=$col fit=${s.coverFitMode}")
                     }
                 }
@@ -159,9 +173,11 @@ object AutoWallpaperGenerator {
                         "$root/.Onyx/cloud/cache/reader/$md5.jpg"
                     )
                     for (cp in cachePaths) {
+                        trace.md5CacheAttempts++
                         val cbmp = BitmapFactory.decodeFile(cp)
                         if (cbmp != null) {
                             AutoRefreshLog.i(context, "cover mode hit row=$row md5 cache=$cp w=${cbmp.width} h=${cbmp.height}")
+                            logCoverProbeSummary(context, startedAt, "hit:md5_cache", title, trace)
                             return PreviewResult(renderCoverWallpaper(context, cbmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title md5 cache fit=${s.coverFitMode}")
                         }
                     }
@@ -176,23 +192,27 @@ object AutoWallpaperGenerator {
                     AutoRefreshLog.i(context, "cover mode row=$row structured specs=${structuredSpecs.joinToString(" | ").take(300)}")
                 }
                 for (spec in structuredSpecs) {
+                    trace.structuredSpecAttempts++
                     val bmp = decodeBitmapByPathOrUri(context, spec)
                     if (bmp != null) {
                         AutoRefreshLog.i(context, "cover mode hit row=$row structured spec=$spec w=${bmp.width} h=${bmp.height}")
+                        logCoverProbeSummary(context, startedAt, "hit:structured_spec", title, trace)
                         return PreviewResult(renderCoverWallpaper(context, bmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title structured fit=${s.coverFitMode}")
                     }
                 }
                 if (nativePath.isNotBlank()) {
-                    fallbackTried++
+                    trace.fileFallbackAttempts++
                     val f = java.io.File(nativePath)
                     val cacheKey = "${nativePath.hashCode()}_${f.lastModified()}.jpg"
                     val myCacheDir = java.io.File(context.cacheDir, "extracted_covers").apply { if (!exists()) mkdirs() }
                     val cacheFile = java.io.File(myCacheDir, cacheKey)
                     
                     if (cacheFile.exists() && cacheFile.length() > 0) {
+                        trace.internalCacheAttempts++
                         val cbmp = android.graphics.BitmapFactory.decodeFile(cacheFile.absolutePath)
                         if (cbmp != null) {
                             AutoRefreshLog.i(context, "cover mode hit by internal cache row=$row title=$title w=${cbmp.width} h=${cbmp.height}")
+                            logCoverProbeSummary(context, startedAt, "hit:internal_cache", title, trace)
                             return PreviewResult(renderCoverWallpaper(context, cbmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title source=internal_cache fit=${s.coverFitMode}")
                         }
                     }
@@ -206,17 +226,41 @@ object AutoWallpaperGenerator {
                             }
                         }
                         AutoRefreshLog.i(context, "cover mode hit by file fallback row=$row title=$title path=$nativePath w=${fallback.width} h=${fallback.height}")
+                        logCoverProbeSummary(context, startedAt, "hit:file_fallback", title, trace)
                         return PreviewResult(renderCoverWallpaper(context, fallback, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title source=file fit=${s.coverFitMode}")
                     } else {
+                        trace.fallbackMissReasons[probe.reason] = (trace.fallbackMissReasons[probe.reason] ?: 0) + 1
                         AutoRefreshLog.i(context, "cover mode row=$row file fallback miss reason=${probe.reason} path=$nativePath")
                     }
                 }
                 val hints = listOf("nativeAbsolutePath", "filePath", "path").mapNotNull { k -> readColString(c, k)?.let { "$k=$it" } }
                 AutoRefreshLog.i(context, "cover mode row=$row no cover decoded title=$title pathHints=${hints.joinToString(";")}")
             } while (row < 30 && c.moveToNext())
-            AutoRefreshLog.i(context, "cover mode exhausted rows=$row candidates=$candidateCount fallbackTried=$fallbackTried no valid cover")
+            AutoRefreshLog.i(context, "cover mode exhausted rows=$row no valid cover")
+            logCoverProbeSummary(context, startedAt, "miss:exhausted", null, trace)
             return null
         }
+    }
+
+    private fun logCoverProbeSummary(
+        context: Context,
+        startedAtMs: Long,
+        outcome: String,
+        title: String?,
+        trace: CoverProbeTrace
+    ) {
+        val cost = System.currentTimeMillis() - startedAtMs
+        val missReasons = if (trace.fallbackMissReasons.isEmpty()) {
+            "-"
+        } else {
+            trace.fallbackMissReasons.entries.joinToString("|") { "${it.key}:${it.value}" }
+        }
+        AutoRefreshLog.i(
+            context,
+            "cover probe summary outcome=$outcome costMs=$cost rows=${trace.rowsScanned} title=${title?.take(48) ?: "-"} " +
+                "colCand=${trace.columnCandidateCount} colTry=${trace.columnDecodeAttempts} md5Try=${trace.md5CacheAttempts} " +
+                "specTry=${trace.structuredSpecAttempts} internalTry=${trace.internalCacheAttempts} fileTry=${trace.fileFallbackAttempts} missReasons=$missReasons"
+        )
     }
 
     private fun readColString(c: android.database.Cursor, name: String): String? {
