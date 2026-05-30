@@ -357,12 +357,7 @@ object AutoWallpaperGenerator {
         val dh = cover.height * scale
         val dst = RectF((w - dw) / 2f, (h - dh) / 2f, (w + dw) / 2f, (h + dh) / 2f)
         canvas.drawBitmap(cover, null, dst, null)
-        val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            textSize = 34f
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        }
-        canvas.drawText(shortTitle(title, 26), 44f, h - 56f, label)
+        // Keep cover mode visually clean: no bottom-left title overlay.
         drawSourceCornerMark(canvas, w, h, sourceMark, 1f)
         return out
     }

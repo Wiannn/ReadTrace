@@ -529,6 +529,10 @@ class MainActivity : AppCompatActivity() {
             addView(RadioButton(context).apply { id = 1202; text = "当前阅读封面(实验性,较耗电)"; isChecked = saved == "COVER" })
             addView(RadioButton(context).apply { id = 1203; text = "自动(熄屏优先封面)(实验性,较耗电)"; isChecked = saved == "AUTO_COVER" })
         }
+        val wallpaperModeHint = TextView(this).apply {
+            text = "提示：封面模式依赖 NeoReader 元数据落库。通常需要先退出当前正在阅读的书籍再锁屏，才会刷新到最新封面；如果在书籍打开状态下直接锁屏，往往仍显示旧封面，通常下一次锁屏才会生效。"
+            textSize = 12f
+        }
         val coverFitModeLabel = TextView(this).apply { text = "封面显示方式" }
         coverFitModeGroup = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
@@ -662,7 +666,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 12f
         }
         val autoWarningText = TextView(this).apply {
-            text = "提示：熄屏触发会增加唤醒次数与耗电，墨水屏建议优先每日定时。"
+            text = "提示：熄屏触发会增加唤醒次数与耗电；NeoReader 常在退出当前书籍/会话落库后才更新元数据，所以可能出现“本次锁屏仍是旧封面、下次锁屏生效”的现象。"
             textSize = 12f
         }
 
@@ -748,7 +752,7 @@ class MainActivity : AppCompatActivity() {
             applySettingsPreview()
         })
         secData.addView(periodLabel); secData.addView(periodGroup); secData.addView(sourceLabel); secData.addView(sourceGroup)
-        secData.addView(wallpaperModeLabel); secData.addView(wallpaperModeGroup); secData.addView(coverFitModeLabel); secData.addView(coverFitModeGroup)
+        secData.addView(wallpaperModeLabel); secData.addView(wallpaperModeGroup); secData.addView(wallpaperModeHint); secData.addView(coverFitModeLabel); secData.addView(coverFitModeGroup)
         secData.addView(timeUnitLabel); secData.addView(timeUnitGroup); secData.addView(weekLabel); secData.addView(weekStartText)
         secData.addView(weekEndText); secData.addView(weekPickerBtn); secData.addView(weekEndPickerBtn); container.addView(secDataBox)
 
