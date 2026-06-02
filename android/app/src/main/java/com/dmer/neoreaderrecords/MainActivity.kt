@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var readingFilterGroup: RadioGroup
     private lateinit var timeUnitGroup: RadioGroup
     private lateinit var wallpaperModeGroup: RadioGroup
+    private lateinit var booxDevicePresetGroup: RadioGroup
     private lateinit var coverFitModeGroup: RadioGroup
     private lateinit var serialModeGroup: RadioGroup
     private lateinit var footerModeGroup: RadioGroup
@@ -125,6 +126,7 @@ class MainActivity : ComponentActivity() {
     private var fontPermissionDebug: String = ""
     private var metadataDebugReport: String = ""
     private var metadataRowsDebugReport: String = ""
+    private var uiDebugReport: String = ""
     private val debugLogName = "neoreader_debug_log.txt"
     private var selectedFontDirUri: String? = null
 
@@ -175,6 +177,7 @@ class MainActivity : ComponentActivity() {
         val serialNumberMode: String,
         val serialNumberCustom: String,
         val serialNumberSize: Float,
+        val booxDevicePreset: String,
         val footerMode: String,
         val barcodeWidthScale: Float,
         val barcodeGapMode: String,
@@ -380,6 +383,7 @@ class MainActivity : ComponentActivity() {
         settingsPage = buildSettingsPage(prefs)
         previewPage = buildPreviewPage()
         einkUiPage = buildEinkUiPage()
+        appendUiDebug("setupUi pages built settings=${settingsPage.javaClass.simpleName} preview=${previewPage.javaClass.simpleName} eink=${einkUiPage.javaClass.simpleName}")
 
         root.addView(navGroup)
         root.addView(changeStateText)
@@ -392,6 +396,59 @@ class MainActivity : ComponentActivity() {
         isInitializingUi = false
         applySettingsPreview()
         writeDebugLog("setupUi_done")
+    }
+
+    private fun appendUiDebug(message: String) {
+        val now = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
+        uiDebugReport += "[$now] $message\n"
+    }
+
+    private fun deviceIdentityText(): String {
+        return listOf(
+            "manufacturer=${android.os.Build.MANUFACTURER}",
+            "brand=${android.os.Build.BRAND}",
+            "model=${android.os.Build.MODEL}",
+            "device=${android.os.Build.DEVICE}",
+            "product=${android.os.Build.PRODUCT}"
+        ).joinToString(", ")
+    }
+
+    private fun detectBooxDevicePreset(): String {
+        val raw = listOf(
+            android.os.Build.MANUFACTURER,
+            android.os.Build.BRAND,
+            android.os.Build.MODEL,
+            android.os.Build.DEVICE,
+            android.os.Build.PRODUCT
+        ).joinToString(" ").uppercase(Locale.ROOT)
+
+        return when {
+            raw.contains("PALMA") -> "PALMA"
+            raw.contains("POKE") && raw.contains("7") && raw.contains("PRO") -> "POKE7_PRO"
+            raw.contains("POKE") && raw.contains("7") -> "POKE7"
+            raw.contains("POKE") && raw.contains("6") && raw.contains("S") -> "POKE6S"
+            raw.contains("POKE") && raw.contains("6") -> "POKE6"
+            raw.contains("P6") && raw.contains("PRO") -> "P6_PRO"
+            raw.contains("P6") -> "P6"
+            raw.contains("LEAF") && raw.contains("5") && raw.contains("C") -> "LEAF5C"
+            raw.contains("LEAF") && raw.contains("5") && raw.contains("+") -> "LEAF5_PLUS"
+            raw.contains("LEAF") && raw.contains("5") -> "LEAF5"
+            raw.contains("NOTE") && raw.contains("X5") && raw.contains("MINI") -> "NOTE_X5_MINI"
+            raw.contains("NOTE") && raw.contains("X5S") -> "NOTE_X5S"
+            raw.contains("NOTE") && raw.contains("X5") -> "NOTE_X5"
+            raw.contains("NOTEX6") || (raw.contains("NOTE") && raw.contains("X6")) -> "NOTEX6"
+            raw.contains("TAB") && raw.contains("10C") && raw.contains("PRO") -> "TAB10C_PRO"
+            raw.contains("T10") && raw.contains("C") -> "T10C"
+            raw.contains("T13") && raw.contains("C") -> "T13C"
+            raw.contains("NOTE") && raw.contains("AIR") && raw.contains("3") && raw.contains("C") -> "NOTE_AIR3C"
+            raw.contains("NOTE") && raw.contains("AIR") && raw.contains("3") -> "NOTE_AIR3"
+            raw.contains("PAGE") -> "PAGE"
+            else -> BooxDevicePresets.DEFAULT_KEY
+        }
+    }
+
+    private fun booxPresetKeyByRadioId(id: Int): String {
+        return BooxDevicePresets.all.getOrNull(id - 1301)?.key ?: BooxDevicePresets.DEFAULT_KEY
     }
 
     private fun buildSettingsPage(prefs: android.content.SharedPreferences): View {
@@ -775,6 +832,28 @@ class MainActivity : ComponentActivity() {
             return row
         }
 
+        fun bindRadioChoiceRow(label: String, group: RadioGroup, options: List<Pair<Int, String>>): LinearLayout {
+            fun optionText(id: Int): String {
+                return (options.firstOrNull { it.first == id }?.second ?: options.first().second)
+                    .replace('\n', ' ')
+            }
+
+            lateinit var value: TextView
+            val (row, valueView) = bindInputRow(label, { optionText(group.checkedRadioButtonId) + " ▼" }) {
+                val labels = options.map { it.second.replace('\n', ' ') }.toTypedArray()
+                AlertDialog.Builder(this)
+                    .setTitle(label)
+                    .setItems(labels) { _, which ->
+                        group.check(options[which].first)
+                        value.text = "${labels[which]} ▼"
+                        if (!isInitializingUi) applySettingsPreview()
+                    }
+                    .show()
+            }
+            value = valueView
+            return row
+        }
+
         fun buildFontSpinner(savedKey: String, fallback: String): Spinner {
             return Spinner(this).apply {
                 adapter = buildFontAdapter(systemFonts)
@@ -804,6 +883,27 @@ class MainActivity : ComponentActivity() {
         val wallpaperOptions = listOf(1201 to "统计壁纸\n生成阅读账单图片", 1202 to "当前阅读封面\n尝试用最近书籍封面", 1203 to "自动封面优先\n有封面用封面，否则用账单")
         val wallpaperNames = listOf("STATS", "COVER", "AUTO_COVER")
         wallpaperModeGroup = makeRadioGroup(wallpaperOptions, selectedId(prefs.getString("wallpaper_mode", "STATS") ?: "STATS", 1201, wallpaperOptions, wallpaperNames))
+
+        val booxDevicePresetOptions = BooxDevicePresets.all.mapIndexed { index, preset ->
+            (1301 + index) to "${preset.label}\n${preset.inchText} ${preset.heightPx}x${preset.widthPx}"
+        }
+        val booxDevicePresetNames = BooxDevicePresets.all.map { it.key }
+        val defaultBooxDevicePreset = if (prefs.contains("boox_device_preset")) {
+            prefs.getString("boox_device_preset", BooxDevicePresets.DEFAULT_KEY) ?: BooxDevicePresets.DEFAULT_KEY
+        } else {
+            detectBooxDevicePreset()
+        }
+        appendUiDebug("booxDevicePreset default=$defaultBooxDevicePreset hasSaved=${prefs.contains("boox_device_preset")} device=${deviceIdentityText()}")
+        booxDevicePresetGroup = makeRadioGroup(
+            booxDevicePresetOptions,
+            selectedId(
+                defaultBooxDevicePreset,
+                1301,
+                booxDevicePresetOptions,
+                booxDevicePresetNames
+            ),
+            RadioGroup.VERTICAL
+        )
 
         val coverFitOptions = listOf(1211 to "完整显示\n不裁掉封面", 1212 to "铺满裁切\n铺满屏幕边缘")
         val coverFitNames = listOf("FIT", "CROP")
@@ -877,6 +977,9 @@ class MainActivity : ComponentActivity() {
         root.addView(hiddenHost)
 
         addSectionTitle("数据与统计", "周期、数据口径、时长单位与日期范围")
+        val booxDevicePresetRow = bindRadioChoiceRow("阅读器尺寸预设", booxDevicePresetGroup, booxDevicePresetOptions)
+        appendUiDebug("buildSettingsPage added booxDevicePresetRow rootChildCount=${root.childCount} rowChildren=${booxDevicePresetRow.childCount}")
+        addHint("说明：这里只保存阅读器和屏幕尺寸选择；暂时不影响生成图片。默认 Leaf5。")
         val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
         addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。")
         val sourceSegment = bindSegmented("数据口径", sourceGroup, sourceOptions, isVertical = true)
@@ -1024,6 +1127,7 @@ class MainActivity : ComponentActivity() {
         autoModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
         serialModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
         wallpaperModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        booxDevicePresetGroup.setOnCheckedChangeListener { _, _ -> if (!isInitializingUi) applySettingsPreview() }
         updateConditionalVisibility()
 
         updateAutoRefreshHint()
@@ -1556,6 +1660,9 @@ class MainActivity : ComponentActivity() {
         
         addSectionTitle("数据与统计", "周期、数据口径、时长单位与日期范围")
         addToggle("最近阅读包含未读（readingStatus=0）", false)
+        addInputMock("阅读器尺寸预设", BooxDevicePresets.byKey(BooxDevicePresets.DEFAULT_KEY).displayText() + " ▼")
+        appendUiDebug("buildEinkUiPage added booxDevicePreset row")
+        addHint("说明：这里只保存阅读器和屏幕尺寸选择；暂时不影响生成图片。默认 Leaf5。")
         addSegmented("统计周期", listOf("当天", "昨天", "本周", "上周", "最近7天", "最近30天", "自定义起止"), 2, isVertical = false)
         addSegmented("数据口径", listOf("按阅读时长事件（推荐）", "按有路径会话", "按Metadata最近访问"), 0, isVertical = true)
         addSegmented("壁纸类型", listOf("统计壁纸", "当前阅读封面(实验性,较耗电)", "自动(熄屏优先封面)(实验性)"), 0, isVertical = true)
@@ -1615,6 +1722,8 @@ class MainActivity : ComponentActivity() {
         previewPage.visibility = View.GONE
         einkUiPage.visibility = View.GONE
         updateTopNavState?.invoke()
+        appendUiDebug("showSettingsPage settingsVisible=${settingsPage.visibility} previewVisible=${previewPage.visibility} einkVisible=${einkUiPage.visibility}")
+        if (!isInitializingUi) writeDebugLog("showSettingsPage")
     }
 
     private fun showPreviewPage() {
@@ -1692,7 +1801,7 @@ class MainActivity : ComponentActivity() {
         val bmp = previewBitmap
         if (bmp != null) {
             previewImage.setImageBitmap(bmp)
-            previewText.text = "App 内实时预览（未写入文件，除非点击生成）"
+            previewText.text = "App 内缩放预览（未写入文件，除非点击生成）\n实际输出: ${bmp.width}x${bmp.height}"
             return
         }
         previewText.text = "暂无预览，请在设置页修改参数或点击生成。"
@@ -1752,6 +1861,7 @@ class MainActivity : ComponentActivity() {
         val serialNumberCustomRaw = serialCustomInput.text.toString().trim()
         val serialNumberCustom = serialNumberCustomRaw.filter { it.isDigit() }.take(12)
         val serialNumberSize = serialNumberSizeInput.text.toString().trim().toFloatOrNull()?.coerceIn(24f, 140f) ?: 46f
+        val booxDevicePreset = booxPresetKeyByRadioId(booxDevicePresetGroup.checkedRadioButtonId)
         val receiptTitle = titleInput.text.toString().ifBlank { "阅读账单" }
         val receiptTitleSize = titleSizeInput.text.toString().trim().toFloatOrNull()?.coerceIn(24f, 120f) ?: 74f
         val receiptBodySize = bodySizeInput.text.toString().trim().toFloatOrNull()?.coerceIn(18f, 60f) ?: 34f
@@ -1783,7 +1893,7 @@ class MainActivity : ComponentActivity() {
         }
         val titleFont = fontSpec(titleFontSpinner.selectedItem?.toString() ?: "SERIF_BOLD")
         val bodyFont = fontSpec(bodyFontSpinner.selectedItem?.toString() ?: "MONO")
-        return Settings(includeUnread, showChart, showProgressStatus, showAuthor, minDurationMinutes, topN, weekStart, weekEnd, periodMode, readingFilterMode, sourceMode, wallpaperMode, coverFitMode, progressMode, timeUnit, receiptTitle, receiptTitleSize, receiptBodySize, serialNumberMode, serialNumberCustom, serialNumberSize, footerMode, barcodeWidthScale, barcodeGapMode, noteText, chartStyleMode, showPeakLabel, yAxisMode, yAxisFixedMaxMinutes, titleFont, bodyFont)
+        return Settings(includeUnread, showChart, showProgressStatus, showAuthor, minDurationMinutes, topN, weekStart, weekEnd, periodMode, readingFilterMode, sourceMode, wallpaperMode, coverFitMode, progressMode, timeUnit, receiptTitle, receiptTitleSize, receiptBodySize, serialNumberMode, serialNumberCustom, serialNumberSize, booxDevicePreset, footerMode, barcodeWidthScale, barcodeGapMode, noteText, chartStyleMode, showPeakLabel, yAxisMode, yAxisFixedMaxMinutes, titleFont, bodyFont)
     }
 
     private fun saveSettings(settings: Settings) {
@@ -1810,6 +1920,7 @@ class MainActivity : ComponentActivity() {
             .putString("serial_number_mode", settings.serialNumberMode)
             .putString("serial_number_custom", settings.serialNumberCustom)
             .putFloat("serial_number_size", settings.serialNumberSize)
+            .putString("boox_device_preset", settings.booxDevicePreset)
             .putString("footer_mode", settings.footerMode)
             .putFloat("barcode_width_scale", settings.barcodeWidthScale)
             .putString("barcode_gap_mode", settings.barcodeGapMode)
@@ -1943,6 +2054,24 @@ class MainActivity : ComponentActivity() {
         return file.absolutePath
     }
 
+    private fun dumpTextTree(view: View, maxItems: Int = 80): String {
+        val out = mutableListOf<String>()
+        fun walk(v: View, depth: Int) {
+            if (out.size >= maxItems) return
+            if (v is TextView) {
+                val text = v.text?.toString()?.replace('\n', '|')?.take(120).orEmpty()
+                if (text.isNotBlank()) {
+                    out += "${"  ".repeat(depth)}${v.javaClass.simpleName}:$text visibility=${v.visibility}"
+                }
+            }
+            if (v is ViewGroup) {
+                for (i in 0 until v.childCount) walk(v.getChildAt(i), depth + 1)
+            }
+        }
+        walk(view, 0)
+        return out.joinToString("\n").ifBlank { "<empty>" }
+    }
+
     private fun writeDebugLog(event: String) {
         try {
             val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -1953,6 +2082,14 @@ class MainActivity : ComponentActivity() {
             FileWriter(f, false).use { w ->
                 w.append("event=").append(event).append('\n')
                 w.append("time=").append(now).append('\n')
+                w.append("deviceIdentity=").append(deviceIdentityText()).append('\n')
+                w.append("detectedBooxDevicePreset=").append(detectBooxDevicePreset()).append('\n')
+                w.append("currentPageKey=").append(currentPageKey).append('\n')
+                if (::settingsPage.isInitialized) {
+                    w.append("settingsPageVisibility=").append(settingsPage.visibility.toString()).append('\n')
+                    w.append("previewPageVisibility=").append(previewPage.visibility.toString()).append('\n')
+                    w.append("einkUiPageVisibility=").append(einkUiPage.visibility.toString()).append('\n')
+                }
                 w.append("selectedWeekStart=").append(selectedWeekStartYmd).append('\n')
                 w.append("settings=").append("includeUnread=").append(s.includeUnread.toString())
                     .append(", showChart=").append(s.showChart.toString())
@@ -1971,6 +2108,7 @@ class MainActivity : ComponentActivity() {
                     .append(", serialNumberMode=").append(s.serialNumberMode)
                     .append(", serialNumberCustom=").append(s.serialNumberCustom)
                     .append(", serialNumberSize=").append(s.serialNumberSize.toString())
+                    .append(", booxDevicePreset=").append(s.booxDevicePreset)
                     .append(", footerMode=").append(s.footerMode)
                     .append(", noteText=").append(s.noteText)
                     .append(", titleFont=").append(s.titleFont)
@@ -1978,6 +2116,14 @@ class MainActivity : ComponentActivity() {
                     .append('\n')
                 w.append("lastSavedPath=").append(lastSavedPath ?: "<null>").append('\n')
                 w.append("fontCount=").append(systemFonts.size.toString()).append('\n')
+                w.append('\n')
+                w.append("uiDebugReport=").append('\n').append(uiDebugReport.ifBlank { "<empty>" }).append('\n')
+                if (::settingsPage.isInitialized) {
+                    w.append("settingsPageTextDump=").append('\n').append(dumpTextTree(settingsPage)).append('\n')
+                }
+                if (::einkUiPage.isInitialized) {
+                    w.append("einkUiPageTextDump=").append('\n').append(dumpTextTree(einkUiPage)).append('\n')
+                }
                 w.append('\n')
                 w.append(fontScanReport)
                 w.append('\n')

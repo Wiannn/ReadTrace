@@ -58,6 +58,7 @@ object AutoWallpaperGenerator {
         val serialNumberMode: String,
         val serialNumberCustom: String,
         val serialNumberSize: Float,
+        val booxDevicePreset: String,
         val footerMode: String,
         val barcodeWidthScale: Float,
         val barcodeGapMode: String,
@@ -119,8 +120,14 @@ object AutoWallpaperGenerator {
             append(", TopN=").append(s.topN)
             append(", 书籍=").append(books.size)
             append(", 时长=").append(formatDuration(stats.totalMs, s.timeUnit))
+            append(", 输出=").append(canvasSizeText(s))
         }
         return PreviewResult(bmp, summary)
+    }
+
+    private fun canvasSizeText(s: AutoSettings): String {
+        val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
+        return "${preset.label} ${preset.widthPx}x${preset.heightPx}"
     }
 
     private fun tryBuildCoverWallpaper(context: Context, s: AutoSettings, sourceMark: String): PreviewResult? {
@@ -162,7 +169,7 @@ object AutoWallpaperGenerator {
                     if (bmp != null) {
                         AutoRefreshLog.i(context, "cover mode hit row=$row column=$col title=$title w=${bmp.width} h=${bmp.height}")
                         logCoverProbeSummary(context, startedAt, "hit:column:$col", title, trace)
-                        return PreviewResult(renderCoverWallpaper(context, bmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title col=$col fit=${s.coverFitMode}")
+                        return PreviewResult(renderCoverWallpaper(context, bmp, title, sourceMark, s), "封面壁纸 title=$title col=$col fit=${s.coverFitMode} size=${canvasSizeText(s)}")
                     }
                 }
                 
@@ -180,7 +187,7 @@ object AutoWallpaperGenerator {
                         if (cbmp != null) {
                             AutoRefreshLog.i(context, "cover mode hit row=$row md5 cache=$cp w=${cbmp.width} h=${cbmp.height}")
                             logCoverProbeSummary(context, startedAt, "hit:md5_cache", title, trace)
-                            return PreviewResult(renderCoverWallpaper(context, cbmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title md5 cache fit=${s.coverFitMode}")
+                            return PreviewResult(renderCoverWallpaper(context, cbmp, title, sourceMark, s), "封面壁纸 title=$title md5 cache fit=${s.coverFitMode} size=${canvasSizeText(s)}")
                         }
                     }
                 }
@@ -199,7 +206,7 @@ object AutoWallpaperGenerator {
                     if (bmp != null) {
                         AutoRefreshLog.i(context, "cover mode hit row=$row structured spec=$spec w=${bmp.width} h=${bmp.height}")
                         logCoverProbeSummary(context, startedAt, "hit:structured_spec", title, trace)
-                        return PreviewResult(renderCoverWallpaper(context, bmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title structured fit=${s.coverFitMode}")
+                        return PreviewResult(renderCoverWallpaper(context, bmp, title, sourceMark, s), "封面壁纸 title=$title structured fit=${s.coverFitMode} size=${canvasSizeText(s)}")
                     }
                 }
                 if (nativePath.isNotBlank()) {
@@ -215,7 +222,7 @@ object AutoWallpaperGenerator {
                         if (cbmp != null) {
                             AutoRefreshLog.i(context, "cover mode hit by internal cache row=$row title=$title w=${cbmp.width} h=${cbmp.height}")
                             logCoverProbeSummary(context, startedAt, "hit:internal_cache", title, trace)
-                            return PreviewResult(renderCoverWallpaper(context, cbmp, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title source=internal_cache fit=${s.coverFitMode}")
+                            return PreviewResult(renderCoverWallpaper(context, cbmp, title, sourceMark, s), "封面壁纸 title=$title source=internal_cache fit=${s.coverFitMode} size=${canvasSizeText(s)}")
                         }
                     }
 
@@ -229,7 +236,7 @@ object AutoWallpaperGenerator {
                         }
                         AutoRefreshLog.i(context, "cover mode hit by file fallback row=$row title=$title path=$nativePath w=${fallback.width} h=${fallback.height}")
                         logCoverProbeSummary(context, startedAt, "hit:file_fallback", title, trace)
-                        return PreviewResult(renderCoverWallpaper(context, fallback, title, sourceMark, s.coverFitMode), "封面壁纸 title=$title source=file fit=${s.coverFitMode}")
+                        return PreviewResult(renderCoverWallpaper(context, fallback, title, sourceMark, s), "封面壁纸 title=$title source=file fit=${s.coverFitMode} size=${canvasSizeText(s)}")
                     } else {
                         trace.fallbackMissReasons[probe.reason] = (trace.fallbackMissReasons[probe.reason] ?: 0) + 1
                         AutoRefreshLog.i(context, "cover mode row=$row file fallback miss reason=${probe.reason} path=$nativePath")
@@ -392,13 +399,14 @@ object AutoWallpaperGenerator {
         return l.endsWith(".jpg") || l.endsWith(".jpeg") || l.endsWith(".png") || l.endsWith(".webp")
     }
 
-    private fun renderCoverWallpaper(context: Context, cover: Bitmap, title: String, sourceMark: String, fitMode: String): Bitmap {
-        val w = context.resources.displayMetrics.widthPixels.coerceAtLeast(1200)
-        val h = context.resources.displayMetrics.heightPixels.coerceAtLeast(1600)
+    private fun renderCoverWallpaper(context: Context, cover: Bitmap, title: String, sourceMark: String, s: AutoSettings): Bitmap {
+        val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
+        val w = preset.widthPx
+        val h = preset.heightPx
         val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(Color.WHITE)
-        val scale = if (fitMode == "CROP") maxOf(w / cover.width.toFloat(), h / cover.height.toFloat())
+        val scale = if (s.coverFitMode == "CROP") maxOf(w / cover.width.toFloat(), h / cover.height.toFloat())
         else minOf(w / cover.width.toFloat(), h / cover.height.toFloat())
         val dw = cover.width * scale
         val dh = cover.height * scale
@@ -433,6 +441,7 @@ object AutoWallpaperGenerator {
             serialNumberMode = p.getString("serial_number_mode", "DATE") ?: "DATE",
             serialNumberCustom = (p.getString("serial_number_custom", "") ?: "").filter { it.isDigit() }.take(12),
             serialNumberSize = p.getFloat("serial_number_size", 46f).coerceIn(24f, 140f),
+            booxDevicePreset = p.getString("boox_device_preset", BooxDevicePresets.DEFAULT_KEY) ?: BooxDevicePresets.DEFAULT_KEY,
             footerMode = p.getString("footer_mode", "NONE") ?: "NONE",
             barcodeWidthScale = p.getFloat("barcode_width_scale", 1.0f).coerceIn(0.6f, 1.6f),
             barcodeGapMode = p.getString("barcode_gap_mode", "STANDARD") ?: "STANDARD",
@@ -455,8 +464,9 @@ object AutoWallpaperGenerator {
         s0: AutoSettings,
         sourceMark: String
     ): Bitmap {
-        val w = context.resources.displayMetrics.widthPixels.coerceAtLeast(1200)
-        val h = context.resources.displayMetrics.heightPixels.coerceAtLeast(1600)
+        val devicePreset = BooxDevicePresets.byKey(s0.booxDevicePreset)
+        val w = devicePreset.widthPx
+        val h = devicePreset.heightPx
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.drawColor(Color.WHITE)
@@ -493,7 +503,7 @@ object AutoWallpaperGenerator {
         c.drawText(serialValue, s(60f) + prefixWidth, serialBaseY, serialNumberPaint)
         c.drawText("操作编号: ${System.currentTimeMillis().toString().takeLast(6)}", s(60f), y + s(95f), text)
         c.drawText("时间: ${fmt(rangeStart)} - ${fmt(rangeEnd)}", s(60f), y + s(145f), text)
-        c.drawText("设备: Onyx Leaf5", s(60f), y + s(195f), text)
+        c.drawText("设备: ${devicePreset.displayText()}", s(60f), y + s(195f), text)
         c.drawText("时长: ${formatDuration(stats.totalMs, s0.timeUnit)}", w - s(520f), y + s(145f), h1)
         c.drawText("书籍: ${books.size}", w - s(520f), y + s(195f), text)
 
