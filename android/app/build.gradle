@@ -13,7 +13,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 103
-        versionName "1.0-clean-settings-size-debug"
+        versionName "1.0.0"
         resConfigs "en", "zh-rCN", "zh-rTW"
     }
     signingConfigs {
