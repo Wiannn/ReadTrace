@@ -888,15 +888,17 @@ class MainActivity : ComponentActivity() {
         val wallpaperNames = listOf("STATS", "COVER", "AUTO_COVER")
         wallpaperModeGroup = makeRadioGroup(wallpaperOptions, selectedId(prefs.getString("wallpaper_mode", "STATS") ?: "STATS", 1201, wallpaperOptions, wallpaperNames))
 
+        val detectedBooxPreset = detectBooxDevicePreset()
         val booxDevicePresetOptions = BooxDevicePresets.all.mapIndexed { index, preset ->
-            (1301 + index) to "${preset.label}\n${preset.inchText} ${preset.heightPx}x${preset.widthPx}"
+            val matchMark = if (preset.key == detectedBooxPreset) " [本机匹配]" else ""
+            (1301 + index) to "${preset.label}$matchMark\n${preset.inchText} ${preset.heightPx}x${preset.widthPx}"
         }
         val booxDevicePresetNames = BooxDevicePresets.all.map { it.key }
         val hasManualBooxPreset = prefs.getBoolean("boox_device_preset_user_set", false)
         val defaultBooxDevicePreset = if (hasManualBooxPreset && prefs.contains("boox_device_preset")) {
             prefs.getString("boox_device_preset", BooxDevicePresets.DEFAULT_KEY) ?: BooxDevicePresets.DEFAULT_KEY
         } else {
-            detectBooxDevicePreset()
+            detectedBooxPreset
         }
         appendUiDebug("booxDevicePreset default=$defaultBooxDevicePreset hasSaved=${prefs.contains("boox_device_preset")} userSet=$hasManualBooxPreset device=${deviceIdentityText()}")
         booxDevicePresetGroup = makeRadioGroup(
@@ -1139,6 +1141,9 @@ class MainActivity : ComponentActivity() {
                     .putBoolean("boox_device_preset_user_set", true)
                     .apply()
                 applySettingsPreview()
+                if (wallpaperModeGroup.checkedRadioButtonId == 1201) {
+                    changeStateText.text = "状态: 尺寸已切换，统计壁纸预览已重新生成｜尺寸: $previewPresetText"
+                }
             }
         }
         updateConditionalVisibility()
