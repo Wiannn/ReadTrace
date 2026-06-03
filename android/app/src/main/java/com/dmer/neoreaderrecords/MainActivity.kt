@@ -100,6 +100,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var autoMinIntervalInput: EditText
     private lateinit var autoModeHintText: TextView
     private lateinit var autoStateText: TextView
+    private lateinit var updateStatusText: TextView
     private lateinit var pickFontDirBtn: Button
     private lateinit var titleFontSpinner: Spinner
     private lateinit var bodyFontSpinner: Spinner
@@ -127,6 +128,7 @@ class MainActivity : ComponentActivity() {
     private var metadataDebugReport: String = ""
     private var metadataRowsDebugReport: String = ""
     private var uiDebugReport: String = ""
+    private var isCheckingUpdates: Boolean = false
     private val debugLogName = "neoreader_debug_log.txt"
     private var selectedFontDirUri: String? = null
 
@@ -218,6 +220,8 @@ class MainActivity : ComponentActivity() {
             validateFontTreePermission()
             reloadFontsFromSources()
             updateAutoRuntimeState()
+            updateReleaseStatusFromCache()
+            checkForUpdatesIfNeeded(force = false)
             writeDebugLog("onResume_rescan")
         }
     }
@@ -393,6 +397,7 @@ class MainActivity : ComponentActivity() {
         showSettingsPage()
         isInitializingUi = false
         applySettingsPreview()
+        checkForUpdatesIfNeeded(force = false)
         writeDebugLog("setupUi_done")
     }
 
@@ -1087,6 +1092,29 @@ class MainActivity : ComponentActivity() {
         }
         val autoWarningText = addHint("提示：熄屏触发会增加唤醒次数与耗电；NeoReader 常在退出当前书籍/会话落库后才更新元数据，所以可能出现“本次锁屏仍是旧封面、下次锁屏生效”的现象。")
 
+        addSectionTitle("版本与更新", "GitHub Release 分发与更新检查")
+        updateStatusText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(Color.DKGRAY)
+            setPadding(0, 0, 0, 16)
+            root.addView(this)
+        }
+        val updateButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 24)
+        }
+        updateButtons.addView(Button(this).apply {
+            text = "检查更新"
+            setOnClickListener { checkForUpdatesIfNeeded(force = true) }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0, 0, 12, 0) })
+        updateButtons.addView(Button(this).apply {
+            text = "打开 Release 页面"
+            setOnClickListener { openReleasePage() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(updateButtons)
+        addHint("说明：App 只检查并跳转 GitHub Release 页面，不会自动下载或安装 APK。")
+        updateReleaseStatusFromCache()
+
         statusText = TextView(this).apply {
             text = "设置后点击按钮生成。"
             textSize = 16f
@@ -1420,6 +1448,53 @@ class MainActivity : ComponentActivity() {
             "按每日定时运行（$dailyTime）"
         }
         autoStateText.text = "自动状态：$runtimeHint\n最近触发：$lastTime（$lastReason）\n当前参数：模式=$mode，定时=$dailyTime，熄屏间隔=${minInterval}分钟"
+    }
+
+    private fun updateReleaseStatusFromCache() {
+        if (!::updateStatusText.isInitialized) return
+        renderReleaseState(GitHubReleaseChecker.cachedState(this))
+    }
+
+    private fun checkForUpdatesIfNeeded(force: Boolean) {
+        if (!force && !GitHubReleaseChecker.shouldAutoCheck(this)) {
+            updateReleaseStatusFromCache()
+            return
+        }
+        if (isCheckingUpdates) return
+        isCheckingUpdates = true
+        if (::updateStatusText.isInitialized) {
+            updateStatusText.text = "当前版本：${GitHubReleaseChecker.currentVersionName(this)}\n更新状态：正在检查 GitHub Release..."
+        }
+        Thread {
+            val state = GitHubReleaseChecker.check(applicationContext)
+            runOnUiThread {
+                isCheckingUpdates = false
+                renderReleaseState(state)
+            }
+        }.start()
+    }
+
+    private fun renderReleaseState(state: GitHubReleaseChecker.State) {
+        if (!::updateStatusText.isInitialized) return
+        val checkedAt = if (state.lastCheckMs > 0L) {
+            SimpleDateFormat("MM-dd HH:mm", Locale.US).format(Date(state.lastCheckMs))
+        } else {
+            "尚未检查"
+        }
+        val latest = state.latestTag.ifBlank { "未知" }
+        val error = if (state.error.isBlank()) "" else "\n失败原因：${state.error.take(80)}"
+        updateStatusText.text = "当前版本：${GitHubReleaseChecker.currentVersionName(this)}\n最新版本：$latest\n更新状态：${state.status}\n最近检查：$checkedAt$error"
+    }
+
+    private fun openReleasePage() {
+        val url = GitHubReleaseChecker.cachedState(this).latestUrl.ifBlank { GitHubReleaseChecker.RELEASES_URL }
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            if (::updateStatusText.isInitialized) {
+                updateStatusText.text = "${updateStatusText.text}\n无法打开链接：${it.javaClass.simpleName}"
+            }
+        }
     }
 
     private fun normalizeDailyTime(raw: String): String {
