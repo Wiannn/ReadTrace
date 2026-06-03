@@ -1,6 +1,7 @@
 package com.dmer.neoreaderrecords
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -9,6 +10,9 @@ import java.util.Locale
 object GitHubReleaseChecker {
     const val RELEASES_URL = "https://github.com/wberry9813/ReadTrace/releases"
     private const val LATEST_RELEASE_API = "https://api.github.com/repos/wberry9813/ReadTrace/releases/latest"
+    private const val RELEASES_API = "https://api.github.com/repos/wberry9813/ReadTrace/releases"
+    private const val TAGS_API = "https://api.github.com/repos/wberry9813/ReadTrace/tags"
+    private const val LATEST_RELEASE_PAGE = "https://github.com/wberry9813/ReadTrace/releases/latest"
     private const val PREFS_NAME = "github_release_update"
     private const val KEY_LAST_CHECK_MS = "update_last_check_ms"
     private const val KEY_LATEST_TAG = "update_latest_tag"
@@ -52,31 +56,111 @@ object GitHubReleaseChecker {
 
     fun check(context: Context): State {
         val localVersion = currentVersionName(context)
-        val conn = (URL(LATEST_RELEASE_API).openConnection() as HttpURLConnection).apply {
+        AutoRefreshLog.i(context, "update check start local=$localVersion")
+        return try {
+            val release = fetchLatestRelease(context, localVersion)
+                ?: fetchFirstReleaseFromList(context, localVersion)
+                ?: fetchFirstTag(context, localVersion)
+                ?: fetchLatestReleasePage(context, localVersion)
+                ?: return saveFailure(context, "GitHub 未返回可用 Release 或 Tag")
+            val status = if (isRemoteNewer(release.tag, localVersion)) {
+                "发现新版本：${release.tag}"
+            } else {
+                "已是最新"
+            }
+            AutoRefreshLog.i(context, "update check success tag=${release.tag} source=${release.source} status=$status")
+            saveState(context, status, release.tag, release.url, release.name, "")
+        } catch (e: Exception) {
+            AutoRefreshLog.e(context, "update check failed", e)
+            saveFailure(context, "${e.javaClass.simpleName}: ${e.message ?: "检查失败"}")
+        }
+    }
+
+    private data class ReleaseInfo(
+        val tag: String,
+        val url: String,
+        val name: String,
+        val source: String
+    )
+
+    private data class HttpResult(
+        val code: Int,
+        val body: String,
+        val finalUrl: String
+    )
+
+    private fun fetchLatestRelease(context: Context, localVersion: String): ReleaseInfo? {
+        val result = httpGet(context, LATEST_RELEASE_API, localVersion, "latest")
+        if (result.code !in 200..299) return null
+        val json = JSONObject(result.body)
+        return releaseFromJson(json, "latest")
+    }
+
+    private fun fetchFirstReleaseFromList(context: Context, localVersion: String): ReleaseInfo? {
+        val result = httpGet(context, RELEASES_API, localVersion, "releases")
+        if (result.code !in 200..299) return null
+        val array = JSONArray(result.body)
+        for (i in 0 until array.length()) {
+            val json = array.optJSONObject(i) ?: continue
+            if (json.optBoolean("draft", false)) continue
+            val release = releaseFromJson(json, "releases")
+            if (release != null) return release
+        }
+        AutoRefreshLog.i(context, "update check releases list empty")
+        return null
+    }
+
+    private fun fetchFirstTag(context: Context, localVersion: String): ReleaseInfo? {
+        val result = httpGet(context, TAGS_API, localVersion, "tags")
+        if (result.code !in 200..299) return null
+        val array = JSONArray(result.body)
+        val json = array.optJSONObject(0) ?: return null
+        val tag = json.optString("name", "").trim()
+        if (tag.isBlank()) return null
+        val url = "https://github.com/wberry9813/ReadTrace/releases/tag/$tag"
+        return ReleaseInfo(tag = tag, url = url, name = tag, source = "tags")
+    }
+
+    private fun fetchLatestReleasePage(context: Context, localVersion: String): ReleaseInfo? {
+        val result = httpGet(context, LATEST_RELEASE_PAGE, localVersion, "release_page", accept = "text/html")
+        if (result.code !in 200..299) return null
+        val tag = Regex("""/releases/tag/([^/?#]+)""").find(result.finalUrl)?.groupValues?.getOrNull(1)
+            ?: Regex("""/releases/tag/([^"'<>?#]+)""").find(result.body)?.groupValues?.getOrNull(1)
+            ?: return null
+        val url = "https://github.com/wberry9813/ReadTrace/releases/tag/$tag"
+        return ReleaseInfo(tag = tag, url = url, name = tag, source = "release_page")
+    }
+
+    private fun releaseFromJson(json: JSONObject, source: String): ReleaseInfo? {
+        val tag = json.optString("tag_name", "").trim()
+        if (tag.isBlank()) return null
+        val url = json.optString("html_url", RELEASES_URL).ifBlank { RELEASES_URL }
+        val name = json.optString("name", tag).ifBlank { tag }
+        return ReleaseInfo(tag = tag, url = url, name = name, source = source)
+    }
+
+    private fun httpGet(
+        context: Context,
+        api: String,
+        localVersion: String,
+        label: String,
+        accept: String = "application/vnd.github+json"
+    ): HttpResult {
+        val conn = (URL(api).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 8_000
             readTimeout = 8_000
-            setRequestProperty("Accept", "application/vnd.github+json")
+            instanceFollowRedirects = true
+            setRequestProperty("Accept", accept)
             setRequestProperty("User-Agent", "ReadTrace-Wallpaper/$localVersion")
         }
         return try {
             val code = conn.responseCode
-            if (code !in 200..299) {
-                return saveFailure(context, "GitHub 返回 HTTP $code")
-            }
-            val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            val json = JSONObject(body)
-            val tag = json.optString("tag_name", "")
-            val url = json.optString("html_url", RELEASES_URL).ifBlank { RELEASES_URL }
-            val name = json.optString("name", tag)
-            val status = if (isRemoteNewer(tag, localVersion)) {
-                "发现新版本：$tag"
-            } else {
-                "已是最新"
-            }
-            saveState(context, status, tag, url, name, "")
-        } catch (e: Exception) {
-            saveFailure(context, "${e.javaClass.simpleName}: ${e.message ?: "检查失败"}")
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            val finalUrl = conn.url?.toString().orEmpty()
+            AutoRefreshLog.i(context, "update check http $label code=$code bytes=${body.length} final=$finalUrl")
+            HttpResult(code, body, finalUrl)
         } finally {
             conn.disconnect()
         }
