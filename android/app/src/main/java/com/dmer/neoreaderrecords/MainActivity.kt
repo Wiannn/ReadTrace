@@ -1424,13 +1424,12 @@ class MainActivity : ComponentActivity() {
             setPadding(12, 24, 12, 24)
         }
         previewText = TextView(this).apply {
-            text = "暂无图片，请先在设置页生成。"
+            visibility = View.GONE
         }
         previewImage = ImageView(this).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
-        container.addView(previewText)
         container.addView(previewImage, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         return container
     }
@@ -1510,14 +1509,10 @@ class MainActivity : ComponentActivity() {
         val bmp = previewBitmap
         if (bmp != null) {
             previewImage.setImageBitmap(bmp)
-            val preset = previewPresetText.ifBlank {
-                val prefs = getSharedPreferences("wallpaper_settings", Context.MODE_PRIVATE)
-                BooxDevicePresets.byKey(prefs.getString("boox_device_preset", BooxDevicePresets.DEFAULT_KEY)).displayText()
-            }
-            previewText.text = "App 内缩放预览（未写入文件，除非点击生成）\n当前预设: $preset\n实际输出: ${bmp.width}x${bmp.height}\n说明: 预览图会按屏幕缩放显示，是否生效以实际输出像素为准。"
+            previewText.text = ""
             return
         }
-        previewText.text = "暂无预览，请在设置页修改参数或点击生成。"
+        previewText.text = ""
         previewImage.setImageDrawable(null)
     }
 
