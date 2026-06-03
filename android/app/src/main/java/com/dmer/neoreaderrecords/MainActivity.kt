@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
     private var updateTopNavState: (() -> Unit)? = null
     private var lastSavedPath: String? = null
     private var previewBitmap: Bitmap? = null
+    private var previewPresetText: String = ""
     private var isInitializingUi: Boolean = false
     private var selectedWeekStartYmd: String = ""
     private var selectedWeekEndYmd: String = ""
@@ -1262,8 +1263,9 @@ class MainActivity : ComponentActivity() {
         saveAndApplyAutoRefreshSettings()
         val (bmp, result) = renderWallpaperPreview(settings)
         previewBitmap = bmp
+        previewPresetText = BooxDevicePresets.byKey(settings.booxDevicePreset).displayText()
         statusText.text = "预览已更新（未写入文件）\n$result"
-        changeStateText.text = "状态: 参数已变更（仅预览）"
+        changeStateText.text = "状态: 参数已变更（仅预览）｜尺寸: $previewPresetText"
         refreshPreview()
         writeDebugLog("preview_updated")
     }
@@ -1329,10 +1331,11 @@ class MainActivity : ComponentActivity() {
         saveAndApplyAutoRefreshSettings()
         val (bmp, result) = renderWallpaperPreview(settings)
         previewBitmap = bmp
+        previewPresetText = BooxDevicePresets.byKey(settings.booxDevicePreset).displayText()
         val saved = saveBitmapToPictures(bmp)
         lastSavedPath = saved
         statusText.text = "已生成并覆盖文件\n$result\n路径: $saved"
-        changeStateText.text = "状态: 已生成并保存"
+        changeStateText.text = "状态: 已生成并保存｜尺寸: $previewPresetText"
         refreshPreview()
         showPreviewPage()
         writeDebugLog("generated_saved")
@@ -1801,7 +1804,11 @@ class MainActivity : ComponentActivity() {
         val bmp = previewBitmap
         if (bmp != null) {
             previewImage.setImageBitmap(bmp)
-            previewText.text = "App 内缩放预览（未写入文件，除非点击生成）\n实际输出: ${bmp.width}x${bmp.height}"
+            val preset = previewPresetText.ifBlank {
+                val prefs = getSharedPreferences("wallpaper_settings", Context.MODE_PRIVATE)
+                BooxDevicePresets.byKey(prefs.getString("boox_device_preset", BooxDevicePresets.DEFAULT_KEY)).displayText()
+            }
+            previewText.text = "App 内缩放预览（未写入文件，除非点击生成）\n当前预设: $preset\n实际输出: ${bmp.width}x${bmp.height}\n说明: 预览图会按屏幕缩放显示，是否生效以实际输出像素为准。"
             return
         }
         previewText.text = "暂无预览，请在设置页修改参数或点击生成。"
