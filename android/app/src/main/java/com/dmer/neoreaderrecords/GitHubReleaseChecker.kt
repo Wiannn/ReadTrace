@@ -63,10 +63,10 @@ object GitHubReleaseChecker {
                 ?: fetchFirstTag(context, localVersion)
                 ?: fetchLatestReleasePage(context, localVersion)
                 ?: return saveFailure(context, "GitHub 未返回可用 Release 或 Tag")
-            val status = if (isRemoteNewer(release.tag, localVersion)) {
-                "发现新版本：${release.tag}"
-            } else {
-                "已是最新"
+            val status = when (compareRemoteToLocal(release.tag, localVersion)) {
+                1 -> "发现新版本：${release.tag}"
+                0 -> "已是最新（当前 ${displayVersion(localVersion)}）"
+                else -> "已是最新（本地 ${displayVersion(localVersion)} 高于 GitHub ${release.tag}）"
             }
             AutoRefreshLog.i(context, "update check success tag=${release.tag} source=${release.source} status=$status")
             saveState(context, status, release.tag, release.url, release.name, "")
@@ -198,16 +198,21 @@ object GitHubReleaseChecker {
         return State(status, latestTag, latestUrl.ifBlank { RELEASES_URL }, latestName, now, error)
     }
 
-    private fun isRemoteNewer(remoteTag: String, localVersion: String): Boolean {
+    private fun compareRemoteToLocal(remoteTag: String, localVersion: String): Int {
         val remote = versionParts(remoteTag)
         val local = versionParts(localVersion)
         val count = maxOf(remote.size, local.size, 3)
         for (i in 0 until count) {
             val r = remote.getOrNull(i) ?: 0
             val l = local.getOrNull(i) ?: 0
-            if (r != l) return r > l
+            if (r != l) return if (r > l) 1 else -1
         }
-        return false
+        return 0
+    }
+
+    private fun displayVersion(value: String): String {
+        val v = value.trim().ifBlank { "unknown" }
+        return if (v.startsWith("v", ignoreCase = true)) v else "v$v"
     }
 
     private fun versionParts(value: String): List<Int> {
