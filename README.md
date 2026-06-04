@@ -1,97 +1,260 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 阅迹壁纸 ReadTrace
 
-# Getting Started
+阅迹壁纸是一个面向文石 BOOX 阅读器的小工具。它读取 NeoReader 的本地阅读记录，生成适合墨水屏锁屏/屏保使用的阅读壁纸。
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+当前主要支持两类壁纸：
 
-## Step 1: Start Metro
+- 统计壁纸：把最近阅读、阅读时长、书单、进度、图表和备注排成一张“阅读账单”。
+- 当前阅读封面：尝试使用最近阅读书籍的本地封面生成壁纸，不访问网络。
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+项目只通过 GitHub Release 分发，不上架应用商店。
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## 适用设备
 
-```sh
-# Using npm
-npm start
+应用主要为文石 BOOX 设备设计，测试设备为 Leaf 5。只要设备能通过 NeoReader 写入阅读记录，理论上都可以尝试使用。
 
-# OR using Yarn
-yarn start
+内置阅读器尺寸预设包括 Poke、P6、Leaf、Note、Tab、T10、T13 等常见型号。首次打开时会尝试根据设备型号自动匹配，匹配不到时默认使用 Leaf 5。
+
+## 安装方式
+
+1. 打开 GitHub Release 页面：
+   https://github.com/wberry9813/ReadTrace/releases
+
+2. 下载适合设备的 APK。
+
+   Leaf 5 等近年的 BOOX 设备通常使用：
+
+   ```text
+   app-arm64-v8a-release.apk
+   ```
+
+   如果安装失败，再尝试：
+
+   ```text
+   app-armeabi-v7a-release.apk
+   ```
+
+3. 把 APK 复制到阅读器，使用文件管理器打开安装。
+
+4. 如果系统提示“不允许安装未知来源应用”，请按系统提示为文件管理器或浏览器开启安装权限。
+
+5. 安装完成后打开“阅迹壁纸”。
+
+## 首次使用
+
+首次打开后，建议按下面顺序操作：
+
+1. 进入“设置”页。
+2. 确认“阅读器尺寸预设”是否为自己的设备型号。
+3. 选择“壁纸类型”。
+4. 点击“刷新预览”，确认 App 能读到阅读记录或书籍封面。
+5. 点击“生成壁纸”，把图片保存到设备图片目录。
+6. 到文石系统的屏保/壁纸设置里选择生成的图片。
+
+生成的壁纸会覆盖保存为同一张图片，路径通常是：
+
+```text
+/storage/emulated/0/Pictures/NeoReader/neoreader_wallpaper.png
 ```
 
-## Step 2: Build and run your app
+这样后续自动刷新时，不需要反复重新选择屏保图片。
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## 权限说明
 
-### Android
+应用可能需要以下权限：
 
-```sh
-# Using npm
-npm run android
+- 读取 NeoReader 数据：用于查询文石阅读记录、书籍路径、阅读进度和统计数据。
+- 文件访问权限：用于读取本地书籍封面、保存生成的壁纸图片。
+- 字体目录授权：用于读取 `存储/Fonts` 中的 `ttf` / `otf` 字体。
+- 网络权限：只用于检查 GitHub Release 是否有新版本。
+- 开机启动/前台服务：用于自动刷新、熄屏触发和定时任务。
 
-# OR using Yarn
-yarn android
+封面壁纸只读取本地书籍和本地缓存封面，不会联网下载封面。
+
+## 页面说明
+
+顶部有四个主要入口：
+
+- 设置：调整数据来源、排版、字体、图表、自动刷新等参数。
+- 预览：在 App 内查看当前设置生成的效果，不会保存真实壁纸文件。
+- 刷新预览：重新读取 NeoReader 数据并更新预览。
+- 生成壁纸：把当前预览对应的壁纸保存到图片目录。
+
+预览页只是 App 内部显示；只有点击“生成壁纸”或自动刷新触发时，才会写入真实图片文件。
+
+## 壁纸类型
+
+### 统计壁纸
+
+统计壁纸最稳定，适合长期作为锁屏阅读账单使用。它会根据设置读取阅读记录，显示周期、设备、阅读时长、书籍列表、进度、图表和备注。
+
+### 当前阅读封面
+
+封面模式会尝试读取最近阅读书籍的本地封面。它依赖 NeoReader 把当前书籍信息写入元数据，因此有一个常见现象：
+
+必须先退出当前正在阅读的书籍，然后锁屏，才更容易刷新到最新封面。如果在书籍打开状态下直接锁屏，往往仍显示旧封面，通常下一次锁屏才会生效。
+
+### 自动封面优先
+
+自动刷新时优先尝试封面壁纸。如果没有拿到可用封面，则回退到统计壁纸。
+
+## 数据与统计选项
+
+### 阅读器尺寸预设
+
+选择目标设备的屏幕尺寸和分辨率。生成图片会按该尺寸输出，预览页会按 App 页面空间等比例缩放显示。
+
+如果列表中有匹配到本机型号的预设，会在选项上做标记。匹配不到时默认 Leaf 5。
+
+### 统计周期
+
+可选范围：
+
+- 当天：只统计今天。
+- 昨天：只统计昨日。
+- 本周：按本周范围统计。
+- 上周：回看上一周。
+- 最近 7 天：滚动统计最近 7 天。
+- 最近 30 天：滚动统计最近 30 天。
+- 自定义起止：手动选择开始和结束日期。
+
+### 数据口径
+
+- 按阅读时长事件：优先统计真实阅读分钟数，推荐使用。
+- 按有路径会话：只要有带路径的打开记录，就算作一本书。
+- 按 Metadata 最近访问：按书库最近打开记录排序，适合看最近访问，但可能包含误打开或未读书籍。
+
+### 时长显示单位
+
+- 小时：显示为更适合阅读的格式，例如 `1小时20分钟`。
+- 分钟：全部换算成分钟，适合核对数据。
+
+## 书单筛选
+
+- 最近阅读包含未读：开启后会把 `readingStatus=0` 的记录也纳入最近阅读；关闭后会尽量排除只进过书库但没开始读的书。
+- 书单筛选状态：可选择全部、仅在读、仅已读完。
+- Top N：控制壁纸最多显示几本书。默认最多 5 本；如果同时显示图表、条码和备注，3 本会更宽松。
+- 最小时长阈值：小于该分钟数的阅读事件会被忽略，用于过滤误打开。
+
+## 排版与字体
+
+- 壁纸标题：可编辑右上角标题，例如“阅读账单”。
+- 标题字号 / 正文字号：控制整张壁纸的字重和可容纳内容。
+- 单号数字模式：可选择月日、随机数或自定义数字。
+- 单号数字字号：数字变大时会向上扩展，减少对下一行的挤压。
+- 进度行显示：可开关书籍进度和阅读状态。
+- 进度显示方式：可选择页数或百分比。
+- 作者行显示：开启后会在进度行上方显示作者；如果 NeoReader 元数据没有作者，会显示未知。
+- 标题字体 / 正文字体：可选择系统字体或已授权字体目录中的字体。
+- 选择字体目录：选择设备的 `存储/Fonts` 目录后，可以使用里面的 `ttf` / `otf` 字体。
+
+## 图表选项
+
+- 显示图表：打开后展示阅读时间分布；如果空间紧张可以关闭。
+- 图表样式：折线或柱状。
+- 峰值标签：显示最高阅读时长标签。
+- Y 轴最大值：自动或固定。固定值适合不同周期之间保持同一比例。
+
+图表横轴规则：
+
+- 当天 / 昨天：按小时。
+- 本周 / 上周 / 最近 7 天：按天。
+- 最近 30 天：按天。
+- 自定义不超过 14 天：按天。
+- 自定义 15 到 90 天：按周。
+- 自定义超过 90 天：按月。
+
+## 底部备注与条码
+
+- 不显示：底部留白更干净。
+- 只显示备注：显示一行自定义文字。
+- 条码 + 备注：显示装饰条码和备注。
+
+条码目前偏装饰用途，不保证所有扫码软件都能识别。备注文本会显示在壁纸底部，适合放一句座右铭、读书计划或周期说明。
+
+## 自动刷新
+
+自动刷新会覆盖保存同一张壁纸图片，便于文石屏保继续使用原路径。
+
+可选模式：
+
+- 每日定时一次：省电，适合稳定更新。
+- 熄屏触发：更及时，但会增加唤醒次数和耗电。
+
+熄屏触发受“熄屏最小间隔”限制。间隔越短越及时，也越容易增加耗电。NeoReader 常在退出当前书籍或会话结束后才写入最新元数据，所以可能出现本次锁屏仍是旧图、下一次锁屏才生效的情况。
+
+## 版本与更新
+
+设置页底部有“版本与更新”区域：
+
+- 检查更新：访问 GitHub Release，比较本地版本和最新版本。
+- 打开 Release 页面：跳转到 GitHub Release 页面。
+
+应用只检查并跳转，不会自动下载或安装 APK。
+
+如果 GitHub 上的版本和本地版本一致，会显示类似：
+
+```text
+已是最新（当前 v1.0.0）
 ```
 
-### iOS
+## 常见问题
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+### 检查更新失败
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+请确认设备能访问 GitHub。应用会依次尝试 GitHub Release API、Release 列表、Tag 列表和 Release 页面跳转地址。如果仍然失败，可以导出日志排查。
 
-```sh
-bundle install
+### 封面壁纸没有更新
+
+先退出当前正在阅读的书籍，再锁屏。NeoReader 的当前书籍信息通常要在退出阅读会话后才会写入数据库。如果第一次锁屏仍然是旧封面，通常下一次锁屏会生效。
+
+### 作者显示未知
+
+作者来自 NeoReader 元数据。如果书籍本身没有作者信息，或者 NeoReader 没有解析出来，就会显示未知。可以关闭作者行节省空间。
+
+### 字体列表里没有 Fonts 目录中的字体
+
+在“选择字体目录”里选择设备的 `存储/Fonts` 目录，不是单个字体文件。授权后回到设置页，标题字体和正文字体列表会出现该目录下的字体。
+
+### 壁纸内容显示不全
+
+减少 Top N，关闭图表或底部条码，或者调小标题/正文字号。统计壁纸会尽量自适应，但墨水屏竖版空间有限。
+
+## 调试日志
+
+如果遇到问题，可以在设备上导出以下日志并反馈：
+
+```text
+/storage/emulated/0/Download/neoreader_debug_log.txt
+/storage/emulated/0/Download/neoreader_auto_refresh_log.txt
 ```
 
-Then, and every time you update your native dependencies, run:
+日志中会记录元数据字段、封面命中来源、自动刷新触发原因、更新检查 HTTP 状态等信息。
+
+## 开发构建
+
+本项目当前核心功能在 Android 原生 Kotlin 代码中。
+
+Debug 构建：
 
 ```sh
-bundle exec pod install
+cd android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+GRADLE_USER_HOME="/Users/dmer/Dev/NeoReaderReaderRecords/.gradle-home" \
+./gradlew assembleDebug --no-daemon
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Release 构建：
 
 ```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+cd android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+GRADLE_USER_HOME="/Users/dmer/Dev/NeoReaderReaderRecords/.gradle-home" \
+./gradlew assembleRelease --no-daemon
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+Release APK 输出位置：
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+```text
+android/app/build/outputs/apk/release/
+```
