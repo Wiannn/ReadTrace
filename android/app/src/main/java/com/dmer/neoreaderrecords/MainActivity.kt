@@ -1995,10 +1995,17 @@ class MainActivity : ComponentActivity() {
 
     private fun dumpTextTree(view: View, maxItems: Int = 80): String {
         val out = mutableListOf<String>()
+        fun redactSecrets(text: String): String {
+            return Regex("""wrk-[A-Za-z0-9_=-]{8,}""").replace(text) { match ->
+                WeReadClient.maskKey(match.value)
+            }
+        }
         fun walk(v: View, depth: Int) {
             if (out.size >= maxItems) return
             if (v is TextView) {
-                val text = v.text?.toString()?.replace('\n', '|')?.take(120).orEmpty()
+                val text = redactSecrets(v.text?.toString().orEmpty())
+                    .replace('\n', '|')
+                    .take(120)
                 if (text.isNotBlank()) {
                     out += "${"  ".repeat(depth)}${v.javaClass.simpleName}:$text visibility=${v.visibility}"
                 }
