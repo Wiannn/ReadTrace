@@ -1170,7 +1170,11 @@ class MainActivity : ComponentActivity() {
             text = "预览微信账单测试"
             setOnClickListener { previewWeReadWallpaper() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
-        addHint("说明：连接测试调用 /shelf/sync；统计和微信账单预览调用 /readdata/detail；封面测试会下载最近阅读书籍封面到 App 缓存目录。当前微信账单只更新 App 内预览，不保存文件，也不参与熄屏自动刷新。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
+        root.addView(Button(this).apply {
+            text = "生成微信账单测试"
+            setOnClickListener { generateWeReadWallpaper() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        addHint("说明：连接测试调用 /shelf/sync；统计、预览和生成微信账单调用 /readdata/detail；封面测试会下载最近阅读书籍封面到 App 缓存目录。当前微信账单生成只支持手动点击，会覆盖保存到 Pictures/NeoReader/neoreader_wallpaper.png，暂不参与熄屏自动刷新。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
         renderWeReadState(WeReadClient.cachedState(this))
 
         addSectionTitle("版本与更新", "GitHub Release 分发与更新检查")
@@ -1657,6 +1661,48 @@ class MainActivity : ComponentActivity() {
                 }
                 appendUiDebug("weread wallpaper $lastWeReadWallpaperDebug")
                 writeDebugLog("weread_wallpaper_preview")
+            }
+        }.start()
+    }
+
+    private fun generateWeReadWallpaper() {
+        if (isTestingWeRead) return
+        saveWeReadApiKeyFromUi()
+        val settings = readSettingsFromUi()
+        saveSettings(settings)
+        val mode = selectedWeReadStatsMode()
+        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("weread_stats_mode", mode)
+            .apply()
+        isTestingWeRead = true
+        changeStateText.text = "状态: 正在生成微信账单壁纸..."
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "微信读书：正在生成并保存${WeReadClient.modeLabel(mode)}账单..."
+        }
+        Thread {
+            val preview = AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+            runOnUiThread {
+                isTestingWeRead = false
+                if (preview != null) {
+                    val saved = saveBitmapToPictures(preview.bitmap)
+                    previewBitmap = preview.bitmap
+                    lastSavedPath = saved
+                    previewPresetText = BooxDevicePresets.byKey(readSettingsFromUi().booxDevicePreset).displayText()
+                    statusText.text = "微信账单已生成并覆盖文件\n${preview.summary}\n路径: $saved"
+                    changeStateText.text = "状态: 微信账单已生成并保存｜尺寸: $previewPresetText"
+                    lastWeReadWallpaperDebug = "ok=true, mode=$mode, saved=$saved, summary=${preview.summary}"
+                    refreshPreview()
+                    showPreviewPage()
+                } else {
+                    changeStateText.text = "状态: 微信账单生成失败"
+                    lastWeReadWallpaperDebug = "ok=false, mode=$mode, saved=<none>"
+                }
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n账单生成：${lastWeReadWallpaperDebug.take(180)}"
+                }
+                appendUiDebug("weread wallpaper generated $lastWeReadWallpaperDebug")
+                writeDebugLog("weread_wallpaper_generated")
             }
         }.start()
     }
