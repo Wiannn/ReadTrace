@@ -254,25 +254,40 @@ object WeReadClient {
             val bookId = book.optString("bookId", "").trim()
             val title = book.optString("title", "未知书籍").ifBlank { "未知书籍" }
             val author = book.optString("author", "未知作者").ifBlank { "未知作者" }
-            val coverUrl = normalizeUrl(book.optString("cover", "").trim())
+            val rawCoverUrl = book.optString("cover", "").trim()
+            val coverUrl = normalizeUrl(rawCoverUrl)
             if (bookId.isBlank() || coverUrl.isBlank()) {
                 return CoverCacheResult(false, "缓存失败", "最新书籍缺少 bookId 或 cover", bookId, title, author, coverUrl, "", 0L, false)
             }
             val dir = File(context.cacheDir, "covers/weread")
             if (!dir.exists()) dir.mkdirs()
             val file = File(dir, "${safeFileName(bookId)}.jpg")
-            if (file.exists() && file.length() > 0L) {
+            val candidates = coverCandidates(rawCoverUrl, bookId)
+            AutoRefreshLog.i(context, "WeRead cover candidates=${candidates.size} title=$title bookId=$bookId first=${candidates.firstOrNull()?.take(120).orEmpty()}")
+            if (file.exists() && file.length() > 180_000L) {
                 val detail = "缓存命中：$title / $author，${file.length()} bytes"
                 AutoRefreshLog.i(context, "WeRead cover cache hit title=$title bookId=$bookId path=${file.absolutePath} bytes=${file.length()}")
                 saveLatestCoverState(context, bookId, title, author, coverUrl, file.absolutePath, file.length())
                 return CoverCacheResult(true, "缓存命中", detail, bookId, title, author, coverUrl, file.absolutePath, file.length(), true)
             }
-            val bytes = httpGetBytes(coverUrl)
-            FileOutputStream(file).use { it.write(bytes) }
-            val detail = "已缓存：$title / $author，${bytes.size} bytes"
-            AutoRefreshLog.i(context, "WeRead cover cached title=$title bookId=$bookId path=${file.absolutePath} bytes=${bytes.size}")
-            saveLatestCoverState(context, bookId, title, author, coverUrl, file.absolutePath, bytes.size.toLong())
-            CoverCacheResult(true, "缓存成功", detail, bookId, title, author, coverUrl, file.absolutePath, bytes.size.toLong(), false)
+            for (candidate in candidates) {
+                val bytes = runCatching { httpGetBytes(candidate) }
+                    .onFailure { AutoRefreshLog.i(context, "WeRead cover candidate failed url=${candidate.take(120)} error=${it.javaClass.simpleName}:${it.message}") }
+                    .getOrNull()
+                    ?: continue
+                FileOutputStream(file).use { it.write(bytes) }
+                val detail = "已缓存：$title / $author，${bytes.size} bytes"
+                AutoRefreshLog.i(context, "WeRead cover cached title=$title bookId=$bookId path=${file.absolutePath} bytes=${bytes.size} url=${candidate.take(120)}")
+                saveLatestCoverState(context, bookId, title, author, candidate, file.absolutePath, bytes.size.toLong())
+                return CoverCacheResult(true, "缓存成功", detail, bookId, title, author, candidate, file.absolutePath, bytes.size.toLong(), false)
+            }
+            if (file.exists() && file.length() > 0L) {
+                val detail = "高清封面拉取失败，沿用旧缓存：$title / $author，${file.length()} bytes"
+                AutoRefreshLog.i(context, "WeRead cover fallback old cache title=$title bookId=$bookId path=${file.absolutePath} bytes=${file.length()}")
+                saveLatestCoverState(context, bookId, title, author, coverUrl, file.absolutePath, file.length())
+                return CoverCacheResult(true, "缓存命中", detail, bookId, title, author, coverUrl, file.absolutePath, file.length(), true)
+            }
+            CoverCacheResult(false, "缓存失败", "所有封面候选地址都无法下载", bookId, title, author, coverUrl, "", 0L, false)
         } catch (e: Exception) {
             AutoRefreshLog.e(context, "WeRead cover cache failed", e)
             CoverCacheResult(false, "缓存失败", "${e.javaClass.simpleName}: ${e.message ?: "缓存失败"}", "", "", "", "", "", 0L, false)
@@ -471,6 +486,27 @@ object WeReadClient {
             value.startsWith("http://") || value.startsWith("https://") -> value
             else -> ""
         }
+    }
+
+    private fun coverCandidates(raw: String, bookId: String): List<String> {
+        val normalizedRaw = normalizeUrl(raw)
+        if (normalizedRaw.isBlank()) return emptyList()
+        val out = linkedSetOf<String>()
+        val normalizedBookId = bookId.ifBlank {
+            Regex("""(?:t\d+|o|b|m|s)_(\d+)\.jpg""")
+                .find(normalizedRaw)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+        if (normalizedBookId.isNotBlank()) {
+            val base = normalizedRaw.replace(Regex("""/[^/]+$"""), "/")
+            out += "${base}o_${normalizedBookId}.jpg"
+            out += "${base}t9_${normalizedBookId}.jpg"
+            out += "${base}t8_${normalizedBookId}.jpg"
+        }
+        out += normalizedRaw
+        return out.toList()
     }
 
     private fun safeFileName(value: String): String {

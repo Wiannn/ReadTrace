@@ -1020,14 +1020,16 @@ class MainActivity : ComponentActivity() {
 
         root.addView(hiddenHost)
 
-        addSectionTitle("数据与统计", "周期、数据口径、时长单位与日期范围")
+        addSectionTitle("数据与统计", "周期、设备尺寸与时长单位")
         val booxDevicePresetRow = bindRadioChoiceRow("阅读器尺寸预设", booxDevicePresetGroup, booxDevicePresetOptions)
         appendUiDebug("buildSettingsPage added booxDevicePresetRow rootChildCount=${root.childCount} rowChildren=${booxDevicePresetRow.childCount}")
         addHint("说明：首次会根据本机型号自动匹配；匹配不到时默认 Leaf5。这个选项会影响预览和生成壁纸的图片分辨率。")
         val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
         addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。")
+
+        addSectionTitle("数据来源", "本地 NeoReader 与微信读书")
         val sourceSegment = bindSegmented("数据口径", sourceGroup, sourceOptions, isVertical = true)
-        addHint("说明：微信读书口径需要先在下方配置 API Key。选择后，顶部“刷新预览”和“生成壁纸”会使用微信读书数据；参数变更不会自动请求接口，避免频繁联网。熄屏自动刷新仍沿用本地 NeoReader 数据。")
+        addHint("说明：本地来源读取文石 NeoReader 的阅读记录，微信读书来源读取微信读书 API。切换本地/微信来源后，请先手动点一次“生成壁纸”写入当前来源的图片；之后本地 NeoReader 的熄屏刷新会继续按本地记录工作。微信读书不参与熄屏自动刷新，避免锁屏时联网耗电。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
         val wallpaperModeHint = addHint("说明：统计壁纸最稳定；封面模式只读取本地书籍封面，不访问网络。提示：封面模式依赖 NeoReader 元数据落库。通常需要先退出当前正在阅读的书籍再锁屏，才会刷新到最新封面；如果在书籍打开状态下直接锁屏，往往仍显示旧封面，通常下一次锁屏才会生效。")
         val coverFitSegment = bindSegmented("封面显示方式", coverFitModeGroup, coverFitOptions, isVertical = false)
