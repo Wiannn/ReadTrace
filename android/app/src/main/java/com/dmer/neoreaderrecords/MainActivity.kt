@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var autoStateText: TextView
     private lateinit var updateStatusText: TextView
     private lateinit var wereadApiKeyInput: EditText
+    private lateinit var wereadStatsModeGroup: RadioGroup
     private lateinit var wereadStatusText: TextView
     private lateinit var pickFontDirBtn: Button
     private lateinit var titleFontSpinner: Spinner
@@ -132,6 +133,7 @@ class MainActivity : ComponentActivity() {
     private var uiDebugReport: String = ""
     private var isCheckingUpdates: Boolean = false
     private var isTestingWeRead: Boolean = false
+    private var lastWeReadStatsDebug: String = ""
     private val debugLogName = "neoreader_debug_log.txt"
     private var selectedFontDirUri: String? = null
 
@@ -1118,6 +1120,19 @@ class MainActivity : ComponentActivity() {
         addSectionTitle("微信读书", "第一阶段只配置 Key 并测试连接，不参与壁纸生成")
         wereadApiKeyInput = makeInput(WeReadClient.loadApiKey(this))
         val wereadKeyRow = bindSecretEditRow("API Key", wereadApiKeyInput)
+        val wereadStatsModeOptions = listOf(9001 to "本周\nweekly", 9002 to "本月\nmonthly", 9003 to "今年\nannually", 9004 to "总计\noverall")
+        val wereadStatsModeNames = listOf("weekly", "monthly", "annually", "overall")
+        wereadStatsModeGroup = makeRadioGroup(
+            wereadStatsModeOptions,
+            selectedId(
+                getSharedPreferences("weread_settings", Context.MODE_PRIVATE).getString("weread_stats_mode", "monthly") ?: "monthly",
+                9002,
+                wereadStatsModeOptions,
+                wereadStatsModeNames
+            ),
+            RadioGroup.HORIZONTAL
+        )
+        val wereadStatsModeSegment = bindSegmented("统计测试周期", wereadStatsModeGroup, wereadStatsModeOptions, isVertical = false)
         wereadStatusText = TextView(this).apply {
             textSize = 13f
             setTextColor(Color.DKGRAY)
@@ -1141,7 +1156,11 @@ class MainActivity : ComponentActivity() {
             setOnClickListener { testWeReadConnection() }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(wereadButtons)
-        addHint("说明：当前只调用微信读书 Skill API 的 /shelf/sync 验证 Key 是否可用；Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
+        root.addView(Button(this).apply {
+            text = "读取统计测试"
+            setOnClickListener { testWeReadStats() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        addHint("说明：连接测试调用 /shelf/sync；统计测试调用 /readdata/detail。当前只做页面展示和日志验证，微信数据还不会参与壁纸生成。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
         renderWeReadState(WeReadClient.cachedState(this))
 
         addSectionTitle("版本与更新", "GitHub Release 分发与更新检查")
@@ -1530,6 +1549,42 @@ class MainActivity : ComponentActivity() {
                 }
                 appendUiDebug("weread test ok=${result.ok} detail=${result.detail.take(120)}")
                 writeDebugLog("weread_test")
+            }
+        }.start()
+    }
+
+    private fun selectedWeReadStatsMode(): String {
+        return when (if (::wereadStatsModeGroup.isInitialized) wereadStatsModeGroup.checkedRadioButtonId else 9002) {
+            9001 -> "weekly"
+            9003 -> "annually"
+            9004 -> "overall"
+            else -> "monthly"
+        }
+    }
+
+    private fun testWeReadStats() {
+        if (isTestingWeRead) return
+        saveWeReadApiKeyFromUi()
+        val mode = selectedWeReadStatsMode()
+        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("weread_stats_mode", mode)
+            .apply()
+        isTestingWeRead = true
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "微信读书：正在读取${WeReadClient.modeLabel(mode)}统计..."
+        }
+        Thread {
+            val result = WeReadClient.fetchReadStats(applicationContext, WeReadClient.loadApiKey(applicationContext), mode)
+            runOnUiThread {
+                isTestingWeRead = false
+                lastWeReadStatsDebug = "ok=${result.ok}, mode=${result.mode}, totalSeconds=${result.totalReadSeconds}, dayAverageSeconds=${result.dayAverageSeconds}, readDays=${result.readDays}, top=${result.topBooks.joinToString("|")}, detail=${result.detail}"
+                renderWeReadState(WeReadClient.cachedState(this))
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n统计结果：${result.detail.take(260)}"
+                }
+                appendUiDebug("weread stats $lastWeReadStatsDebug")
+                writeDebugLog("weread_stats_test")
             }
         }.start()
     }
@@ -1974,6 +2029,7 @@ class MainActivity : ComponentActivity() {
                     .append(", lastTestMs=").append(wereadState.lastTestMs.toString())
                     .append(", error=").append(wereadState.error)
                     .append('\n')
+                w.append("lastWeReadStats=").append(lastWeReadStatsDebug.ifBlank { "<empty>" }).append('\n')
                 w.append("currentPageKey=").append(currentPageKey).append('\n')
                 if (::settingsPage.isInitialized) {
                     w.append("settingsPageVisibility=").append(settingsPage.visibility.toString()).append('\n')

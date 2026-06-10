@@ -30,6 +30,17 @@ object WeReadClient {
         val hasMp: Boolean
     )
 
+    data class ReadStatsResult(
+        val ok: Boolean,
+        val status: String,
+        val detail: String,
+        val mode: String,
+        val totalReadSeconds: Long,
+        val dayAverageSeconds: Long,
+        val readDays: Int,
+        val topBooks: List<String>
+    )
+
     fun loadApiKey(context: Context): String {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_API_KEY, "")
@@ -109,6 +120,59 @@ object WeReadClient {
         }
     }
 
+    fun fetchReadStats(context: Context, apiKey: String, mode: String): ReadStatsResult {
+        val key = apiKey.trim()
+        if (key.isBlank()) {
+            return ReadStatsResult(false, "读取失败", "未配置 API Key", mode, 0L, 0L, 0, emptyList())
+        }
+        AutoRefreshLog.i(context, "WeRead stats start mode=$mode key=${maskKey(key)}")
+        return try {
+            val body = JSONObject()
+                .put("api_name", "/readdata/detail")
+                .put("mode", mode)
+                .put("skill_version", SKILL_VERSION)
+                .toString()
+            val result = postJson(key, body)
+            AutoRefreshLog.i(context, "WeRead stats http mode=$mode code=${result.code} bytes=${result.body.length}")
+            if (result.code !in 200..299) {
+                return ReadStatsResult(false, "读取失败", "HTTP ${result.code}: ${result.body.take(120)}", mode, 0L, 0L, 0, emptyList())
+            }
+            val json = JSONObject(result.body)
+            val upgradeInfo = json.optJSONObject("upgrade_info")
+            if (upgradeInfo != null) {
+                return ReadStatsResult(false, "读取失败", "Skill 需要升级：${upgradeInfo.optString("message", "请升级 skill")}", mode, 0L, 0L, 0, emptyList())
+            }
+            val errCode = json.optInt("errcode", 0)
+            if (errCode != 0) {
+                return ReadStatsResult(false, "读取失败", "接口错误 errcode=$errCode ${json.optString("errmsg", "").take(80)}", mode, 0L, 0L, 0, emptyList())
+            }
+            val total = json.optLong("totalReadTime", 0L)
+            val average = json.optLong("dayAverageReadTime", 0L)
+            val readDays = json.optInt("readDays", 0)
+            val top = mutableListOf<String>()
+            val longest = json.optJSONArray("readLongest")
+            if (longest != null) {
+                for (i in 0 until minOf(longest.length(), 5)) {
+                    val item = longest.optJSONObject(i) ?: continue
+                    val book = item.optJSONObject("book")
+                    val album = item.optJSONObject("albumInfo")
+                    val title = book?.optString("title")?.takeIf { it.isNotBlank() }
+                        ?: album?.optString("name")?.takeIf { it.isNotBlank() }
+                        ?: "未知条目"
+                    val seconds = item.optLong("readTime", 0L)
+                    top.add("${i + 1}. $title ${formatSeconds(seconds)}")
+                }
+            }
+            val detail = "${modeLabel(mode)}：总时长 ${formatSeconds(total)}，阅读天数 ${readDays} 天，自然日均 ${formatSeconds(average)}" +
+                if (top.isEmpty()) "" else "\n排行：${top.joinToString("；")}"
+            AutoRefreshLog.i(context, "WeRead stats success mode=$mode total=$total readDays=$readDays top=${top.joinToString("|")}")
+            ReadStatsResult(true, "读取成功", detail, mode, total, average, readDays, top)
+        } catch (e: Exception) {
+            AutoRefreshLog.e(context, "WeRead stats failed mode=$mode", e)
+            ReadStatsResult(false, "读取失败", "${e.javaClass.simpleName}: ${e.message ?: "读取失败"}", mode, 0L, 0L, 0, emptyList())
+        }
+    }
+
     private data class HttpResult(val code: Int, val body: String)
 
     private fun postJson(apiKey: String, body: String): HttpResult {
@@ -151,5 +215,22 @@ object WeReadClient {
             .putString(KEY_ERROR, error)
             .apply()
         return TestResult(false, "连接失败", error, 0, 0, false)
+    }
+
+    fun formatSeconds(seconds: Long): String {
+        val minutes = (seconds / 60L).coerceAtLeast(0L)
+        val hours = minutes / 60L
+        val remain = minutes % 60L
+        return if (hours > 0L) "${hours}小时${remain}分钟" else "${remain}分钟"
+    }
+
+    fun modeLabel(mode: String): String {
+        return when (mode) {
+            "weekly" -> "本周"
+            "monthly" -> "本月"
+            "annually" -> "今年"
+            "overall" -> "总计"
+            else -> mode
+        }
     }
 }
