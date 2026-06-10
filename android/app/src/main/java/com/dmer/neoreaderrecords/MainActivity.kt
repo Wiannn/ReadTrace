@@ -134,6 +134,7 @@ class MainActivity : ComponentActivity() {
     private var isCheckingUpdates: Boolean = false
     private var isTestingWeRead: Boolean = false
     private var lastWeReadStatsDebug: String = ""
+    private var lastWeReadCoverDebug: String = ""
     private val debugLogName = "neoreader_debug_log.txt"
     private var selectedFontDirUri: String? = null
 
@@ -1160,7 +1161,11 @@ class MainActivity : ComponentActivity() {
             text = "读取统计测试"
             setOnClickListener { testWeReadStats() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
-        addHint("说明：连接测试调用 /shelf/sync；统计测试调用 /readdata/detail。当前只做页面展示和日志验证，微信数据还不会参与壁纸生成。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
+        root.addView(Button(this).apply {
+            text = "缓存最近封面测试"
+            setOnClickListener { testWeReadCoverCache() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        addHint("说明：连接测试调用 /shelf/sync；统计测试调用 /readdata/detail；封面测试会下载最近阅读书籍封面到 App 缓存目录。当前只做页面展示和日志验证，微信数据还不会参与壁纸生成。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
         renderWeReadState(WeReadClient.cachedState(this))
 
         addSectionTitle("版本与更新", "GitHub Release 分发与更新检查")
@@ -1585,6 +1590,28 @@ class MainActivity : ComponentActivity() {
                 }
                 appendUiDebug("weread stats $lastWeReadStatsDebug")
                 writeDebugLog("weread_stats_test")
+            }
+        }.start()
+    }
+
+    private fun testWeReadCoverCache() {
+        if (isTestingWeRead) return
+        saveWeReadApiKeyFromUi()
+        isTestingWeRead = true
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "微信读书：正在缓存最近阅读封面..."
+        }
+        Thread {
+            val result = WeReadClient.cacheLatestCover(applicationContext, WeReadClient.loadApiKey(applicationContext))
+            runOnUiThread {
+                isTestingWeRead = false
+                lastWeReadCoverDebug = "ok=${result.ok}, status=${result.status}, title=${result.title}, author=${result.author}, bookId=${result.bookId}, bytes=${result.bytes}, fromCache=${result.fromCache}, path=${result.cachePath}, detail=${result.detail}"
+                renderWeReadState(WeReadClient.cachedState(this))
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n封面结果：${result.detail.take(220)}"
+                }
+                appendUiDebug("weread cover $lastWeReadCoverDebug")
+                writeDebugLog("weread_cover_cache_test")
             }
         }.start()
     }
@@ -2037,6 +2064,7 @@ class MainActivity : ComponentActivity() {
                     .append(", error=").append(wereadState.error)
                     .append('\n')
                 w.append("lastWeReadStats=").append(lastWeReadStatsDebug.ifBlank { "<empty>" }).append('\n')
+                w.append("lastWeReadCover=").append(lastWeReadCoverDebug.ifBlank { "<empty>" }).append('\n')
                 w.append("currentPageKey=").append(currentPageKey).append('\n')
                 if (::settingsPage.isInitialized) {
                     w.append("settingsPageVisibility=").append(settingsPage.visibility.toString()).append('\n')
