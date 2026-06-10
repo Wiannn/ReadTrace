@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
 
     data class BookItem(val title: String, val author: String?, val progress: String?, val status: Int, val path: String?)
 
-    enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS }
+    enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS, WEREAD }
     enum class PeriodMode { TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
     enum class ReadingFilterMode { ALL, READING_ONLY, FINISHED_ONLY }
     enum class ChartStyleMode { LINE, BAR }
@@ -911,8 +911,13 @@ class MainActivity : ComponentActivity() {
         val savedPeriod = prefs.getString("period_mode", PeriodMode.THIS_WEEK.name) ?: PeriodMode.THIS_WEEK.name
         periodGroup = makeRadioGroup(periodOptions, selectedId(savedPeriod, 4001, periodOptions, periodNames))
 
-        val sourceOptions = listOf(1001 to "按阅读时长事件（推荐）\n优先统计真实阅读分钟数", 1002 to "按有路径会话\n有打开记录就算一本", 1003 to "按Metadata最近访问\n按书库最近打开排序")
-        val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.PATH_SESSION.name, DataSourceMode.METADATA_ACCESS.name)
+        val sourceOptions = listOf(
+            1001 to "按阅读时长事件（推荐）\n优先统计真实阅读分钟数",
+            1002 to "按有路径会话\n有打开记录就算一本",
+            1003 to "按Metadata最近访问\n按书库最近打开排序",
+            1004 to "微信读书\n使用微信读书统计生成账单"
+        )
+        val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.PATH_SESSION.name, DataSourceMode.METADATA_ACCESS.name, DataSourceMode.WEREAD.name)
         sourceGroup = makeRadioGroup(sourceOptions, selectedId(prefs.getString("source_mode", DataSourceMode.DURATION.name) ?: DataSourceMode.DURATION.name, 1001, sourceOptions, sourceNames))
 
         val wallpaperOptions = listOf(1201 to "统计壁纸\n生成阅读账单图片", 1202 to "当前阅读封面\n尝试用最近书籍封面", 1203 to "自动封面优先\n有封面用封面，否则用账单")
@@ -1022,6 +1027,7 @@ class MainActivity : ComponentActivity() {
         val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
         addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。")
         val sourceSegment = bindSegmented("数据口径", sourceGroup, sourceOptions, isVertical = true)
+        addHint("说明：微信读书口径需要先在下方配置 API Key。选择后，顶部“刷新预览”和“生成壁纸”会使用微信读书数据；参数变更不会自动请求接口，避免频繁联网。熄屏自动刷新仍沿用本地 NeoReader 数据。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
         val wallpaperModeHint = addHint("说明：统计壁纸最稳定；封面模式只读取本地书籍封面，不访问网络。提示：封面模式依赖 NeoReader 元数据落库。通常需要先退出当前正在阅读的书籍再锁屏，才会刷新到最新封面；如果在书籍打开状态下直接锁屏，往往仍显示旧封面，通常下一次锁屏才会生效。")
         val coverFitSegment = bindSegmented("封面显示方式", coverFitModeGroup, coverFitOptions, isVertical = false)
@@ -1391,6 +1397,15 @@ class MainActivity : ComponentActivity() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
         saveAndApplyAutoRefreshSettings()
+        if (settings.sourceMode == DataSourceMode.WEREAD) {
+            saveWeReadStatsModeFromUi()
+            previewPresetText = BooxDevicePresets.byKey(settings.booxDevicePreset).displayText()
+            statusText.text = "微信读书口径已保存\n请点击“刷新预览”或“生成壁纸”获取最新微信读书账单。"
+            changeStateText.text = "状态: 微信读书参数已变更（未联网）｜尺寸: $previewPresetText"
+            refreshPreview()
+            writeDebugLog("weread_source_settings_saved")
+            return
+        }
         val (bmp, result) = renderWallpaperPreview(settings)
         previewBitmap = bmp
         previewPresetText = BooxDevicePresets.byKey(settings.booxDevicePreset).displayText()
@@ -1457,6 +1472,10 @@ class MainActivity : ComponentActivity() {
 
     private fun generateAndSaveFromCurrentSettings() {
         val settings = readSettingsFromUi()
+        if (settings.sourceMode == DataSourceMode.WEREAD) {
+            generateWeReadWallpaper()
+            return
+        }
         saveSettings(settings)
         saveAndApplyAutoRefreshSettings()
         val (bmp, result) = renderWallpaperPreview(settings)
@@ -1576,14 +1595,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun testWeReadStats() {
-        if (isTestingWeRead) return
-        saveWeReadApiKeyFromUi()
+    private fun saveWeReadStatsModeFromUi(): String {
         val mode = selectedWeReadStatsMode()
         getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
             .edit()
             .putString("weread_stats_mode", mode)
             .apply()
+        return mode
+    }
+
+    private fun testWeReadStats() {
+        if (isTestingWeRead) return
+        saveWeReadApiKeyFromUi()
+        val mode = saveWeReadStatsModeFromUi()
         isTestingWeRead = true
         if (::wereadStatusText.isInitialized) {
             wereadStatusText.text = "微信读书：正在读取${WeReadClient.modeLabel(mode)}统计..."
@@ -1630,11 +1654,7 @@ class MainActivity : ComponentActivity() {
         saveWeReadApiKeyFromUi()
         val settings = readSettingsFromUi()
         saveSettings(settings)
-        val mode = selectedWeReadStatsMode()
-        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
-            .edit()
-            .putString("weread_stats_mode", mode)
-            .apply()
+        val mode = saveWeReadStatsModeFromUi()
         isTestingWeRead = true
         changeStateText.text = "状态: 正在生成微信账单预览..."
         if (::wereadStatusText.isInitialized) {
@@ -1670,11 +1690,7 @@ class MainActivity : ComponentActivity() {
         saveWeReadApiKeyFromUi()
         val settings = readSettingsFromUi()
         saveSettings(settings)
-        val mode = selectedWeReadStatsMode()
-        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
-            .edit()
-            .putString("weread_stats_mode", mode)
-            .apply()
+        val mode = saveWeReadStatsModeFromUi()
         isTestingWeRead = true
         changeStateText.text = "状态: 正在生成微信账单壁纸..."
         if (::wereadStatusText.isInitialized) {
@@ -1801,6 +1817,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshPreviewData() {
+        val settings = readSettingsFromUi()
+        if (settings.sourceMode == DataSourceMode.WEREAD) {
+            previewWeReadWallpaper()
+            collectMetadataDebugSample()
+            showPreviewPage()
+            return
+        }
         applySettingsPreview()
         collectMetadataDebugSample()
         writeDebugLog("manual_refresh_preview")
@@ -1891,6 +1914,7 @@ class MainActivity : ComponentActivity() {
         val sourceMode = when (sourceGroup.checkedRadioButtonId) {
             1002 -> DataSourceMode.PATH_SESSION
             1003 -> DataSourceMode.METADATA_ACCESS
+            1004 -> DataSourceMode.WEREAD
             else -> DataSourceMode.DURATION
         }
         val wallpaperMode = when (wallpaperModeGroup.checkedRadioButtonId) {

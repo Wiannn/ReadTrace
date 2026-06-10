@@ -898,7 +898,12 @@ object AutoWallpaperGenerator {
     }
 
     private fun drawSourceCornerMark(canvas: Canvas, w: Int, h: Int, sourceMark: String, gs: Float) {
-        val label = if (sourceMark.uppercase(Locale.US).startsWith("A")) "A" else "M"
+        val upper = sourceMark.uppercase(Locale.US)
+        val label = when {
+            upper.startsWith("A") -> "A"
+            upper.startsWith("W") -> "W"
+            else -> "M"
+        }
         val radius = (11f * gs).coerceAtLeast(9f)
         val cx = w - (26f * gs)
         val cy = h - (24f * gs)
