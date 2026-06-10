@@ -101,6 +101,33 @@ object AutoWallpaperGenerator {
         return runCatching { buildPreviewInternal(context, sourceMark, false) }.getOrNull()
     }
 
+    fun buildWeReadStatsPreviewFromPrefs(context: Context, sourceMark: String = "W"): PreviewResult? {
+        return runCatching {
+            val s = readSettings(context)
+            val wp = context.getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
+            val mode = wp.getString("weread_stats_mode", "monthly") ?: "monthly"
+            val stats = WeReadClient.fetchWallpaperStats(context, WeReadClient.loadApiKey(context), mode)
+            if (!stats.ok) {
+                AutoRefreshLog.i(context, "WeRead wallpaper preview failed ${stats.detail}")
+                return@runCatching null
+            }
+            val range = weReadRange(stats)
+            val chart = weReadChartStats(stats, mode)
+            val books = stats.books
+                .take(s.topN)
+                .map { BookItem(it.title, it.author, WeReadClient.formatSeconds(it.readSeconds), 1) }
+            val bmp = draw(context, range.first, range.second, chart, books, s, sourceMark)
+            val summary = buildString {
+                append("微信读书 ")
+                append(WeReadClient.modeLabel(mode))
+                append(", 书籍=").append(books.size)
+                append(", 时长=").append(formatDuration(chart.totalMs, s.timeUnit))
+                append(", 输出=").append(canvasSizeText(s))
+            }
+            PreviewResult(bmp, summary)
+        }.getOrNull()
+    }
+
     private fun buildPreviewInternal(context: Context, sourceMark: String, fromAutoWorker: Boolean): PreviewResult? {
         val s = readSettings(context)
         val tryCover = s.wallpaperMode == "COVER" || (s.wallpaperMode == "AUTO_COVER" && fromAutoWorker)
@@ -128,6 +155,53 @@ object AutoWallpaperGenerator {
     private fun canvasSizeText(s: AutoSettings): String {
         val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
         return "${preset.label} ${preset.widthPx}x${preset.heightPx}"
+    }
+
+    private fun weReadRange(stats: WeReadClient.WallpaperStatsResult): Pair<Long, Long> {
+        val now = System.currentTimeMillis()
+        val baseMs = stats.baseTimeSeconds * 1000L
+        if (stats.mode == "overall") {
+            val first = stats.buckets.firstOrNull()?.first?.times(1000L) ?: now
+            return first to now
+        }
+        if (baseMs <= 0L) return now to now
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        cal.timeInMillis = baseMs
+        val start = cal.timeInMillis
+        when (stats.mode) {
+            "weekly" -> cal.add(Calendar.DAY_OF_MONTH, 6)
+            "monthly" -> {
+                cal.add(Calendar.MONTH, 1)
+                cal.add(Calendar.DAY_OF_MONTH, -1)
+            }
+            "annually" -> {
+                cal.add(Calendar.YEAR, 1)
+                cal.add(Calendar.DAY_OF_MONTH, -1)
+            }
+            else -> cal.add(Calendar.DAY_OF_MONTH, 0)
+        }
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        cal.set(Calendar.MILLISECOND, 999)
+        return start to minOf(cal.timeInMillis, now)
+    }
+
+    private fun weReadChartStats(stats: WeReadClient.WallpaperStatsResult, mode: String): ChartStats {
+        if (stats.buckets.isEmpty()) {
+            return ChartStats(stats.totalReadSeconds * 1000L, longArrayOf(stats.totalReadSeconds * 1000L), listOf(WeReadClient.modeLabel(mode)))
+        }
+        val values = stats.buckets.map { it.second * 1000L }.toLongArray()
+        val labels = stats.buckets.map { (seconds, _) ->
+            val d = Date(seconds * 1000L)
+            when (mode) {
+                "annually" -> SimpleDateFormat("MM月", Locale.US).format(d)
+                "overall" -> SimpleDateFormat("yyyy", Locale.US).format(d)
+                else -> SimpleDateFormat("MM-dd", Locale.US).format(d)
+            }
+        }
+        val total = if (stats.totalReadSeconds > 0L) stats.totalReadSeconds * 1000L else values.sum()
+        return ChartStats(total, values, labels)
     }
 
     private fun tryBuildCoverWallpaper(context: Context, s: AutoSettings, sourceMark: String): PreviewResult? {

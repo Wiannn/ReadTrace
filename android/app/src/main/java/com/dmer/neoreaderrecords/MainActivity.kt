@@ -135,6 +135,7 @@ class MainActivity : ComponentActivity() {
     private var isTestingWeRead: Boolean = false
     private var lastWeReadStatsDebug: String = ""
     private var lastWeReadCoverDebug: String = ""
+    private var lastWeReadWallpaperDebug: String = ""
     private val debugLogName = "neoreader_debug_log.txt"
     private var selectedFontDirUri: String? = null
 
@@ -1165,7 +1166,11 @@ class MainActivity : ComponentActivity() {
             text = "缓存最近封面测试"
             setOnClickListener { testWeReadCoverCache() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
-        addHint("说明：连接测试调用 /shelf/sync；统计测试调用 /readdata/detail；封面测试会下载最近阅读书籍封面到 App 缓存目录。当前只做页面展示和日志验证，微信数据还不会参与壁纸生成。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
+        root.addView(Button(this).apply {
+            text = "预览微信账单测试"
+            setOnClickListener { previewWeReadWallpaper() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        addHint("说明：连接测试调用 /shelf/sync；统计和微信账单预览调用 /readdata/detail；封面测试会下载最近阅读书籍封面到 App 缓存目录。当前微信账单只更新 App 内预览，不保存文件，也不参与熄屏自动刷新。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
         renderWeReadState(WeReadClient.cachedState(this))
 
         addSectionTitle("版本与更新", "GitHub Release 分发与更新检查")
@@ -1612,6 +1617,46 @@ class MainActivity : ComponentActivity() {
                 }
                 appendUiDebug("weread cover $lastWeReadCoverDebug")
                 writeDebugLog("weread_cover_cache_test")
+            }
+        }.start()
+    }
+
+    private fun previewWeReadWallpaper() {
+        if (isTestingWeRead) return
+        saveWeReadApiKeyFromUi()
+        val settings = readSettingsFromUi()
+        saveSettings(settings)
+        val mode = selectedWeReadStatsMode()
+        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("weread_stats_mode", mode)
+            .apply()
+        isTestingWeRead = true
+        changeStateText.text = "状态: 正在生成微信账单预览..."
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "微信读书：正在生成${WeReadClient.modeLabel(mode)}账单预览..."
+        }
+        Thread {
+            val preview = AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+            runOnUiThread {
+                isTestingWeRead = false
+                if (preview != null) {
+                    previewBitmap = preview.bitmap
+                    previewPresetText = BooxDevicePresets.byKey(readSettingsFromUi().booxDevicePreset).displayText()
+                    statusText.text = "微信账单预览已更新（未写入文件）\n${preview.summary}"
+                    changeStateText.text = "状态: 微信账单预览已更新｜尺寸: $previewPresetText"
+                    lastWeReadWallpaperDebug = "ok=true, mode=$mode, summary=${preview.summary}"
+                    refreshPreview()
+                    showPreviewPage()
+                } else {
+                    changeStateText.text = "状态: 微信账单预览失败"
+                    lastWeReadWallpaperDebug = "ok=false, mode=$mode"
+                }
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n账单预览：${lastWeReadWallpaperDebug.take(180)}"
+                }
+                appendUiDebug("weread wallpaper $lastWeReadWallpaperDebug")
+                writeDebugLog("weread_wallpaper_preview")
             }
         }.start()
     }
@@ -2065,6 +2110,7 @@ class MainActivity : ComponentActivity() {
                     .append('\n')
                 w.append("lastWeReadStats=").append(lastWeReadStatsDebug.ifBlank { "<empty>" }).append('\n')
                 w.append("lastWeReadCover=").append(lastWeReadCoverDebug.ifBlank { "<empty>" }).append('\n')
+                w.append("lastWeReadWallpaper=").append(lastWeReadWallpaperDebug.ifBlank { "<empty>" }).append('\n')
                 w.append("currentPageKey=").append(currentPageKey).append('\n')
                 if (::settingsPage.isInitialized) {
                     w.append("settingsPageVisibility=").append(settingsPage.visibility.toString()).append('\n')

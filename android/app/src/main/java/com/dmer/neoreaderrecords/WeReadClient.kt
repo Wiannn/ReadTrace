@@ -56,6 +56,24 @@ object WeReadClient {
         val fromCache: Boolean
     )
 
+    data class WallpaperBook(
+        val title: String,
+        val author: String,
+        val readSeconds: Long
+    )
+
+    data class WallpaperStatsResult(
+        val ok: Boolean,
+        val status: String,
+        val detail: String,
+        val mode: String,
+        val baseTimeSeconds: Long,
+        val totalReadSeconds: Long,
+        val readDays: Int,
+        val buckets: List<Pair<Long, Long>>,
+        val books: List<WallpaperBook>
+    )
+
     fun loadApiKey(context: Context): String {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_API_KEY, "")
@@ -252,6 +270,73 @@ object WeReadClient {
             CoverCacheResult(false, "缓存失败", "${e.javaClass.simpleName}: ${e.message ?: "缓存失败"}", "", "", "", "", "", 0L, false)
         }
     }
+
+    fun fetchWallpaperStats(context: Context, apiKey: String, mode: String): WallpaperStatsResult {
+        val key = apiKey.trim()
+        if (key.isBlank()) {
+            return WallpaperStatsResult(false, "读取失败", "未配置 API Key", mode, 0L, 0L, 0, emptyList(), emptyList())
+        }
+        AutoRefreshLog.i(context, "WeRead wallpaper stats start mode=$mode key=${maskKey(key)}")
+        return try {
+            val body = JSONObject()
+                .put("api_name", "/readdata/detail")
+                .put("mode", mode)
+                .put("skill_version", SKILL_VERSION)
+                .toString()
+            val result = postJson(key, body)
+            AutoRefreshLog.i(context, "WeRead wallpaper stats http mode=$mode code=${result.code} bytes=${result.body.length}")
+            if (result.code !in 200..299) {
+                return WallpaperStatsResult(false, "读取失败", "HTTP ${result.code}: ${result.body.take(120)}", mode, 0L, 0L, 0, emptyList(), emptyList())
+            }
+            val json = JSONObject(result.body)
+            val upgradeInfo = json.optJSONObject("upgrade_info")
+            if (upgradeInfo != null) {
+                return WallpaperStatsResult(false, "读取失败", "Skill 需要升级：${upgradeInfo.optString("message", "请升级 skill")}", mode, 0L, 0L, 0, emptyList(), emptyList())
+            }
+            val errCode = json.optInt("errcode", 0)
+            if (errCode != 0) {
+                return WallpaperStatsResult(false, "读取失败", "接口错误 errcode=$errCode ${json.optString("errmsg", "").take(80)}", mode, 0L, 0L, 0, emptyList(), emptyList())
+            }
+            val readTimes = json.optJSONObject("readTimes")
+            val buckets = mutableListOf<Pair<Long, Long>>()
+            if (readTimes != null) {
+                val keys = readTimes.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val ts = k.toLongOrNull() ?: continue
+                    val seconds = readTimes.optLong(k, 0L)
+                    if (seconds > 0L) buckets.add(ts to seconds)
+                }
+            }
+            buckets.sortBy { it.first }
+
+            val books = mutableListOf<WallpaperBook>()
+            val longest = json.optJSONArray("readLongest")
+            if (longest != null) {
+                for (i in 0 until longest.length()) {
+                    val item = longest.optJSONObject(i) ?: continue
+                    val book = item.optJSONObject("book")
+                    val album = item.optJSONObject("albumInfo")
+                    val title = book?.optString("title")?.takeIf { it.isNotBlank() }
+                        ?: album?.optString("name")?.takeIf { it.isNotBlank() }
+                        ?: "未知条目"
+                    val author = book?.optString("author")?.takeIf { it.isNotBlank() }
+                        ?: album?.optString("authorName")?.takeIf { it.isNotBlank() }
+                        ?: "未知"
+                    books.add(WallpaperBook(title, author, item.optLong("readTime", 0L)))
+                }
+            }
+            val total = json.optLong("totalReadTime", 0L)
+            val readDays = json.optInt("readDays", 0)
+            val detail = "${modeLabel(mode)}：${formatSeconds(total)}，阅读天数 $readDays，排行 ${books.size} 条"
+            AutoRefreshLog.i(context, "WeRead wallpaper stats success mode=$mode total=$total buckets=${buckets.size} books=${books.size}")
+            WallpaperStatsResult(true, "读取成功", detail, mode, json.optLong("baseTime", 0L), total, readDays, buckets, books)
+        } catch (e: Exception) {
+            AutoRefreshLog.e(context, "WeRead wallpaper stats failed mode=$mode", e)
+            WallpaperStatsResult(false, "读取失败", "${e.javaClass.simpleName}: ${e.message ?: "读取失败"}", mode, 0L, 0L, 0, emptyList(), emptyList())
+        }
+    }
+
 
     private data class HttpResult(val code: Int, val body: String)
 
