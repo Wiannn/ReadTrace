@@ -128,6 +128,39 @@ object AutoWallpaperGenerator {
         }.getOrNull()
     }
 
+    fun buildWeReadCoverPreviewFromPrefs(context: Context, sourceMark: String = "W"): PreviewResult? {
+        return runCatching {
+            val s = readSettings(context)
+            val fetched = WeReadClient.cacheLatestCover(context, WeReadClient.loadApiKey(context))
+            val cover = if (fetched.ok) {
+                fetched
+            } else {
+                val cached = WeReadClient.cachedLatestCover(context)
+                if (cached != null) {
+                    AutoRefreshLog.i(context, "WeRead cover wallpaper fallback cached detail=${fetched.detail.take(120)}")
+                    cached
+                } else {
+                    AutoRefreshLog.i(context, "WeRead cover wallpaper failed ${fetched.detail}")
+                    return@runCatching null
+                }
+            }
+            val bmp = BitmapFactory.decodeFile(cover.cachePath)
+            if (bmp == null) {
+                AutoRefreshLog.i(context, "WeRead cover wallpaper decode failed path=${cover.cachePath}")
+                return@runCatching null
+            }
+            val rendered = renderCoverWallpaper(context, bmp, cover.title, sourceMark, s)
+            val summary = buildString {
+                append("微信读书封面 title=").append(cover.title)
+                append(", author=").append(cover.author)
+                append(", source=").append(if (cover.fromCache) "cache" else "network")
+                append(", fit=").append(s.coverFitMode)
+                append(", 输出=").append(canvasSizeText(s))
+            }
+            PreviewResult(rendered, summary)
+        }.getOrNull()
+    }
+
     private fun buildPreviewInternal(context: Context, sourceMark: String, fromAutoWorker: Boolean): PreviewResult? {
         val s = readSettings(context)
         val tryCover = s.wallpaperMode == "COVER" || (s.wallpaperMode == "AUTO_COVER" && fromAutoWorker)

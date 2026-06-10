@@ -13,6 +13,12 @@ object WeReadClient {
     private const val KEY_STATUS = "weread_status"
     private const val KEY_LAST_TEST_MS = "weread_last_test_ms"
     private const val KEY_ERROR = "weread_error"
+    private const val KEY_LAST_COVER_BOOK_ID = "weread_last_cover_book_id"
+    private const val KEY_LAST_COVER_TITLE = "weread_last_cover_title"
+    private const val KEY_LAST_COVER_AUTHOR = "weread_last_cover_author"
+    private const val KEY_LAST_COVER_URL = "weread_last_cover_url"
+    private const val KEY_LAST_COVER_PATH = "weread_last_cover_path"
+    private const val KEY_LAST_COVER_BYTES = "weread_last_cover_bytes"
     private const val API_GATEWAY = "https://i.weread.qq.com/api/agent/gateway"
     private const val SKILL_VERSION = "1.0.3"
 
@@ -258,17 +264,53 @@ object WeReadClient {
             if (file.exists() && file.length() > 0L) {
                 val detail = "缓存命中：$title / $author，${file.length()} bytes"
                 AutoRefreshLog.i(context, "WeRead cover cache hit title=$title bookId=$bookId path=${file.absolutePath} bytes=${file.length()}")
+                saveLatestCoverState(context, bookId, title, author, coverUrl, file.absolutePath, file.length())
                 return CoverCacheResult(true, "缓存命中", detail, bookId, title, author, coverUrl, file.absolutePath, file.length(), true)
             }
             val bytes = httpGetBytes(coverUrl)
             FileOutputStream(file).use { it.write(bytes) }
             val detail = "已缓存：$title / $author，${bytes.size} bytes"
             AutoRefreshLog.i(context, "WeRead cover cached title=$title bookId=$bookId path=${file.absolutePath} bytes=${bytes.size}")
+            saveLatestCoverState(context, bookId, title, author, coverUrl, file.absolutePath, bytes.size.toLong())
             CoverCacheResult(true, "缓存成功", detail, bookId, title, author, coverUrl, file.absolutePath, bytes.size.toLong(), false)
         } catch (e: Exception) {
             AutoRefreshLog.e(context, "WeRead cover cache failed", e)
             CoverCacheResult(false, "缓存失败", "${e.javaClass.simpleName}: ${e.message ?: "缓存失败"}", "", "", "", "", "", 0L, false)
         }
+    }
+
+    fun cachedLatestCover(context: Context): CoverCacheResult? {
+        val p = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val path = p.getString(KEY_LAST_COVER_PATH, "").orEmpty()
+        if (path.isBlank()) return null
+        val file = File(path)
+        if (!file.exists() || file.length() <= 0L) return null
+        val bookId = p.getString(KEY_LAST_COVER_BOOK_ID, "").orEmpty()
+        val title = p.getString(KEY_LAST_COVER_TITLE, "未知书籍") ?: "未知书籍"
+        val author = p.getString(KEY_LAST_COVER_AUTHOR, "未知作者") ?: "未知作者"
+        val coverUrl = p.getString(KEY_LAST_COVER_URL, "").orEmpty()
+        val bytes = p.getLong(KEY_LAST_COVER_BYTES, file.length()).takeIf { it > 0L } ?: file.length()
+        return CoverCacheResult(true, "缓存命中", "使用上次缓存：$title / $author，${file.length()} bytes", bookId, title, author, coverUrl, file.absolutePath, bytes, true)
+    }
+
+    private fun saveLatestCoverState(
+        context: Context,
+        bookId: String,
+        title: String,
+        author: String,
+        coverUrl: String,
+        cachePath: String,
+        bytes: Long
+    ) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LAST_COVER_BOOK_ID, bookId)
+            .putString(KEY_LAST_COVER_TITLE, title)
+            .putString(KEY_LAST_COVER_AUTHOR, author)
+            .putString(KEY_LAST_COVER_URL, coverUrl)
+            .putString(KEY_LAST_COVER_PATH, cachePath)
+            .putLong(KEY_LAST_COVER_BYTES, bytes)
+            .apply()
     }
 
     fun fetchWallpaperStats(context: Context, apiKey: String, mode: String): WallpaperStatsResult {

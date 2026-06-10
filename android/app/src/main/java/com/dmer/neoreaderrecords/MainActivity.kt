@@ -1661,7 +1661,7 @@ class MainActivity : ComponentActivity() {
             wereadStatusText.text = "微信读书：正在生成${WeReadClient.modeLabel(mode)}账单预览..."
         }
         Thread {
-            val preview = AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+            val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
             runOnUiThread {
                 isTestingWeRead = false
                 if (preview != null) {
@@ -1697,7 +1697,7 @@ class MainActivity : ComponentActivity() {
             wereadStatusText.text = "微信读书：正在生成并保存${WeReadClient.modeLabel(mode)}账单..."
         }
         Thread {
-            val preview = AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+            val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
             runOnUiThread {
                 isTestingWeRead = false
                 if (preview != null) {
@@ -1721,6 +1721,15 @@ class MainActivity : ComponentActivity() {
                 writeDebugLog("weread_wallpaper_generated")
             }
         }.start()
+    }
+
+    private fun buildWeReadPreviewForWallpaperMode(wallpaperMode: String): AutoWallpaperGenerator.PreviewResult? {
+        return when (wallpaperMode) {
+            "COVER" -> AutoWallpaperGenerator.buildWeReadCoverPreviewFromPrefs(applicationContext, "W")
+            "AUTO_COVER" -> AutoWallpaperGenerator.buildWeReadCoverPreviewFromPrefs(applicationContext, "W")
+                ?: AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+            else -> AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+        }
     }
 
     private fun renderWeReadState(state: WeReadClient.State) {
