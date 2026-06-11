@@ -9,6 +9,7 @@ object AutoRefreshConfig {
     const val KEY_DAILY_TIME = "auto_daily_time"
     const val KEY_SCREEN_OFF_MIN_INTERVAL = "auto_screen_off_min_interval_minutes"
     const val KEY_LAST_TRIGGER_MS = "auto_last_trigger_ms"
+    const val KEY_WEREAD_LAST_PREWARM_MS = "weread_last_prewarm_ms"
     const val KEY_LAST_REASON = "auto_last_reason"
 
     const val MODE_DAILY = "DAILY"

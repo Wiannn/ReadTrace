@@ -32,8 +32,10 @@ class ScreenOffMonitorService : Service() {
                 AutoRefreshLog.i(this@ScreenOffMonitorService, "ScreenOffMonitorService receiver action=${intent?.action}")
                 if (intent?.action == Intent.ACTION_SCREEN_OFF) {
                     AutoRefreshWorker.enqueue(this@ScreenOffMonitorService, "screen_off")
-                } else if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_USER_PRESENT) {
+                } else if (intent?.action == Intent.ACTION_SCREEN_ON) {
                     AutoRefreshWorker.enqueue(this@ScreenOffMonitorService, "screen_on_prewarm")
+                } else if (intent?.action == Intent.ACTION_USER_PRESENT) {
+                    AutoRefreshWorker.enqueue(this@ScreenOffMonitorService, "user_present_prewarm")
                 }
             }
         }

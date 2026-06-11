@@ -255,6 +255,10 @@ object WeReadClient {
             val title = book.optString("title", "未知书籍").ifBlank { "未知书籍" }
             val author = book.optString("author", "未知作者").ifBlank { "未知作者" }
             val rawCoverUrl = book.optString("cover", "").trim()
+            AutoRefreshLog.i(
+                context,
+                "WeRead cover latest selected title=$title author=$author bookId=$bookId readUpdateTime=${book.optLong("readUpdateTime", 0L)}"
+            )
             val coverUrl = normalizeUrl(rawCoverUrl)
             if (bookId.isBlank() || coverUrl.isBlank()) {
                 return CoverCacheResult(false, "缓存失败", "最新书籍缺少 bookId 或 cover", bookId, title, author, coverUrl, "", 0L, false)

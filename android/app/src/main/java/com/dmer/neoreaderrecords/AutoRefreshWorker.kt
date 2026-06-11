@@ -27,17 +27,22 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
         val delta = now - lastMs
 
         if (sourceMode == "WEREAD") {
-            if (reason != "screen_on_prewarm") {
+            if (reason != "screen_on_prewarm" && reason != "user_present_prewarm") {
                 AutoRefreshLog.i(applicationContext, "Worker skip WeRead source on reason=$reason")
                 return Result.success()
             }
-            if (delta < minIntervalMs) {
-                AutoRefreshLog.i(applicationContext, "Worker skip WeRead by debounce: delta=${delta}ms < $minIntervalMs ms")
+            val wereadPrewarmMinMs = 5_000L
+            val wereadLastMs = prefs.getLong(AutoRefreshConfig.KEY_WEREAD_LAST_PREWARM_MS, 0L)
+            val wereadDelta = now - wereadLastMs
+            if (wereadDelta < wereadPrewarmMinMs) {
+                AutoRefreshLog.i(applicationContext, "Worker skip WeRead duplicate prewarm: reason=$reason delta=${wereadDelta}ms < $wereadPrewarmMinMs ms")
                 return Result.success()
             }
+            AutoRefreshLog.i(applicationContext, "Worker WeRead prewarm accepted: reason=$reason delta=${wereadDelta}ms")
             val ok = AutoWallpaperGenerator.generateAndSaveWeRead(applicationContext, reason)
             if (ok) {
                 prefs.edit()
+                    .putLong(AutoRefreshConfig.KEY_WEREAD_LAST_PREWARM_MS, now)
                     .putLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, now)
                     .putString(AutoRefreshConfig.KEY_LAST_REASON, reason)
                     .apply()
