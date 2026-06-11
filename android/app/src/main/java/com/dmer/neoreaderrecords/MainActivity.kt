@@ -912,12 +912,10 @@ class MainActivity : ComponentActivity() {
         periodGroup = makeRadioGroup(periodOptions, selectedId(savedPeriod, 4001, periodOptions, periodNames))
 
         val sourceOptions = listOf(
-            1001 to "按阅读时长事件（推荐）\n优先统计真实阅读分钟数",
-            1002 to "按有路径会话\n有打开记录就算一本",
-            1003 to "按Metadata最近访问\n按书库最近打开排序",
-            1004 to "微信读书\n使用微信读书统计生成账单"
+            1001 to "Neo 阅读器\n读取文石本地阅读记录",
+            1004 to "微信读书\n使用微信读书统计与封面"
         )
-        val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.PATH_SESSION.name, DataSourceMode.METADATA_ACCESS.name, DataSourceMode.WEREAD.name)
+        val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.WEREAD.name)
         sourceGroup = makeRadioGroup(sourceOptions, selectedId(prefs.getString("source_mode", DataSourceMode.DURATION.name) ?: DataSourceMode.DURATION.name, 1001, sourceOptions, sourceNames))
 
         val wallpaperOptions = listOf(1201 to "统计壁纸\n生成阅读账单图片", 1202 to "当前阅读封面\n尝试用最近书籍封面", 1203 to "自动封面优先\n有封面用封面，否则用账单")
@@ -1020,16 +1018,14 @@ class MainActivity : ComponentActivity() {
 
         root.addView(hiddenHost)
 
-        addSectionTitle("数据与统计", "周期、设备尺寸与时长单位")
+        addSectionTitle("数据与统计", "周期、数据来源、设备尺寸与时长单位")
         val booxDevicePresetRow = bindRadioChoiceRow("阅读器尺寸预设", booxDevicePresetGroup, booxDevicePresetOptions)
         appendUiDebug("buildSettingsPage added booxDevicePresetRow rootChildCount=${root.childCount} rowChildren=${booxDevicePresetRow.childCount}")
         addHint("说明：首次会根据本机型号自动匹配；匹配不到时默认 Leaf5。这个选项会影响预览和生成壁纸的图片分辨率。")
         val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
         addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。")
-
-        addSectionTitle("数据来源", "本地 NeoReader 与微信读书")
-        val sourceSegment = bindSegmented("数据口径", sourceGroup, sourceOptions, isVertical = true)
-        addHint("说明：本地来源读取文石 NeoReader 的阅读记录，微信读书来源读取微信读书 API。切换本地/微信来源后，请先手动点一次“生成壁纸”写入当前来源的图片；之后本地 NeoReader 的熄屏刷新会继续按本地记录工作。微信读书不参与熄屏自动刷新，避免锁屏时联网耗电。")
+        val sourceSegment = bindSegmented("数据来源", sourceGroup, sourceOptions, isVertical = true)
+        addHint("说明：切换本地/微信来源后，请先手动点一次“生成壁纸”写入当前来源的图片；之后本地 Neo 阅读器的熄屏刷新会继续按本地记录工作。微信读书不参与熄屏自动刷新，避免锁屏时联网耗电。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
         val wallpaperModeHint = addHint("说明：统计壁纸最稳定；封面模式只读取本地书籍封面，不访问网络。提示：封面模式依赖 NeoReader 元数据落库。通常需要先退出当前正在阅读的书籍再锁屏，才会刷新到最新封面；如果在书籍打开状态下直接锁屏，往往仍显示旧封面，通常下一次锁屏才会生效。")
         val coverFitSegment = bindSegmented("封面显示方式", coverFitModeGroup, coverFitOptions, isVertical = false)
@@ -1400,9 +1396,9 @@ class MainActivity : ComponentActivity() {
         saveSettings(settings)
         saveAndApplyAutoRefreshSettings()
         if (settings.sourceMode == DataSourceMode.WEREAD) {
-            saveWeReadStatsModeFromUi()
+            saveWeReadStatsModeForSettings(settings)
             previewPresetText = BooxDevicePresets.byKey(settings.booxDevicePreset).displayText()
-            statusText.text = "微信读书口径已保存\n请点击“刷新预览”或“生成壁纸”获取最新微信读书账单。"
+            statusText.text = "微信读书来源已保存\n请点击“刷新预览”或“生成壁纸”获取最新微信读书内容。"
             changeStateText.text = "状态: 微信读书参数已变更（未联网）｜尺寸: $previewPresetText"
             refreshPreview()
             writeDebugLog("weread_source_settings_saved")
@@ -1606,6 +1602,23 @@ class MainActivity : ComponentActivity() {
         return mode
     }
 
+    private fun weReadStatsModeForPeriod(periodMode: PeriodMode): String {
+        return when (periodMode) {
+            PeriodMode.LAST_30_DAYS -> "monthly"
+            PeriodMode.CUSTOM -> "monthly"
+            else -> "weekly"
+        }
+    }
+
+    private fun saveWeReadStatsModeForSettings(settings: Settings): String {
+        val mode = weReadStatsModeForPeriod(settings.periodMode)
+        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("weread_stats_mode", mode)
+            .apply()
+        return mode
+    }
+
     private fun testWeReadStats() {
         if (isTestingWeRead) return
         saveWeReadApiKeyFromUi()
@@ -1656,11 +1669,11 @@ class MainActivity : ComponentActivity() {
         saveWeReadApiKeyFromUi()
         val settings = readSettingsFromUi()
         saveSettings(settings)
-        val mode = saveWeReadStatsModeFromUi()
+        val mode = saveWeReadStatsModeForSettings(settings)
         isTestingWeRead = true
         changeStateText.text = "状态: 正在生成微信账单预览..."
         if (::wereadStatusText.isInitialized) {
-            wereadStatusText.text = "微信读书：正在生成${WeReadClient.modeLabel(mode)}账单预览..."
+            wereadStatusText.text = "微信读书：正在按统计周期生成${WeReadClient.modeLabel(mode)}账单预览..."
         }
         Thread {
             val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
@@ -1692,11 +1705,11 @@ class MainActivity : ComponentActivity() {
         saveWeReadApiKeyFromUi()
         val settings = readSettingsFromUi()
         saveSettings(settings)
-        val mode = saveWeReadStatsModeFromUi()
+        val mode = saveWeReadStatsModeForSettings(settings)
         isTestingWeRead = true
         changeStateText.text = "状态: 正在生成微信账单壁纸..."
         if (::wereadStatusText.isInitialized) {
-            wereadStatusText.text = "微信读书：正在生成并保存${WeReadClient.modeLabel(mode)}账单..."
+            wereadStatusText.text = "微信读书：正在按统计周期生成并保存${WeReadClient.modeLabel(mode)}账单..."
         }
         Thread {
             val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
