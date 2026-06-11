@@ -1171,6 +1171,10 @@ class MainActivity : ComponentActivity() {
             setOnClickListener { testWeReadCoverCache() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
         root.addView(Button(this).apply {
+            text = "清理所有封面缓存"
+            setOnClickListener { clearAllCoverCaches() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        root.addView(Button(this).apply {
             text = "预览微信账单测试"
             setOnClickListener { previewWeReadWallpaper() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
@@ -1178,6 +1182,7 @@ class MainActivity : ComponentActivity() {
             text = "生成微信账单测试"
             setOnClickListener { generateWeReadWallpaper() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        addHint("当前书识别：微信读书封面按 /shelf/sync 中 readUpdateTime 最新的书籍判断，不是直接读取微信读书正在显示的前台页面。刚切换书籍时微信同步可能有延迟，通常下一次解锁或手动刷新后会更新。")
         addHint("说明：连接和最近封面会调用 /shelf/sync；统计壁纸会调用 /readdata/detail；封面会缓存到 App 私有目录。选择“数据来源=微信读书”后，手动预览/生成会立即联网；自动模式下不在熄屏时联网，而是在解锁后预热刷新，网络未恢复会短间隔重试，成功后覆盖保存到 Pictures/NeoReader/neoreader_wallpaper.png。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
         renderWeReadState(WeReadClient.cachedState(this))
 
@@ -1561,6 +1566,43 @@ class MainActivity : ComponentActivity() {
         if (!::wereadApiKeyInput.isInitialized) return
         WeReadClient.saveApiKey(this, wereadApiKeyInput.text.toString())
         appendUiDebug("weread api key saved key=${WeReadClient.maskKey(wereadApiKeyInput.text.toString())}")
+    }
+
+    private fun clearAllCoverCaches() {
+        val targets = listOf(
+            File(cacheDir, "extracted_covers"),
+            File(cacheDir, "covers")
+        )
+        var fileCount = 0
+        var byteCount = 0L
+        targets.forEach { dir ->
+            if (dir.exists()) {
+                dir.walkTopDown()
+                    .filter { it.isFile }
+                    .forEach {
+                        fileCount += 1
+                        byteCount += it.length()
+                    }
+                dir.deleteRecursively()
+            }
+        }
+        WeReadClient.clearCoverCacheState(this)
+        val message = "已清理封面缓存：${fileCount}个文件，${formatBytes(byteCount)}"
+        AutoRefreshLog.i(this, "cover cache cleared files=$fileCount bytes=$byteCount")
+        appendUiDebug("cover cache cleared files=$fileCount bytes=$byteCount")
+        if (::statusText.isInitialized) statusText.text = message
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "${wereadStatusText.text}\n$message"
+        }
+        writeDebugLog("cover_cache_cleared")
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes >= 1024L * 1024L -> String.format(Locale.US, "%.1f MB", bytes / 1024f / 1024f)
+            bytes >= 1024L -> String.format(Locale.US, "%.1f KB", bytes / 1024f)
+            else -> "${bytes} B"
+        }
     }
 
     private fun testWeReadConnection() {

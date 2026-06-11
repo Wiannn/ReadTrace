@@ -312,6 +312,18 @@ object WeReadClient {
         return CoverCacheResult(true, "缓存命中", "使用上次缓存：$title / $author，${file.length()} bytes", bookId, title, author, coverUrl, file.absolutePath, bytes, true)
     }
 
+    fun clearCoverCacheState(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_LAST_COVER_BOOK_ID)
+            .remove(KEY_LAST_COVER_TITLE)
+            .remove(KEY_LAST_COVER_AUTHOR)
+            .remove(KEY_LAST_COVER_URL)
+            .remove(KEY_LAST_COVER_PATH)
+            .remove(KEY_LAST_COVER_BYTES)
+            .apply()
+    }
+
     private fun saveLatestCoverState(
         context: Context,
         bookId: String,
