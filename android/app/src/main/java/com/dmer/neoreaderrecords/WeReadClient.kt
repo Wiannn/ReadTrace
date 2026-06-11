@@ -121,7 +121,7 @@ object WeReadClient {
                 .put("api_name", "/shelf/sync")
                 .put("skill_version", SKILL_VERSION)
                 .toString()
-            val result = postJson(key, body)
+            val result = postJson(key, body.toString())
             AutoRefreshLog.i(context, "WeRead test http code=${result.code} bytes=${result.body.length}")
             if (result.code !in 200..299) {
                 return saveFailure(context, "HTTP ${result.code}: ${result.body.take(120)}")
@@ -171,7 +171,7 @@ object WeReadClient {
                 .put("mode", mode)
                 .put("skill_version", SKILL_VERSION)
                 .toString()
-            val result = postJson(key, body)
+            val result = postJson(key, body.toString())
             AutoRefreshLog.i(context, "WeRead stats http mode=$mode code=${result.code} bytes=${result.body.length}")
             if (result.code !in 200..299) {
                 return ReadStatsResult(false, "读取失败", "HTTP ${result.code}: ${result.body.take(120)}", mode, 0L, 0L, 0, emptyList())
@@ -328,20 +328,22 @@ object WeReadClient {
             .apply()
     }
 
-    fun fetchWallpaperStats(context: Context, apiKey: String, mode: String): WallpaperStatsResult {
+    fun fetchWallpaperStats(context: Context, apiKey: String, mode: String, baseTimeSeconds: Long? = null): WallpaperStatsResult {
         val key = apiKey.trim()
         if (key.isBlank()) {
             return WallpaperStatsResult(false, "读取失败", "未配置 API Key", mode, 0L, 0L, 0, emptyList(), emptyList())
         }
-        AutoRefreshLog.i(context, "WeRead wallpaper stats start mode=$mode key=${maskKey(key)}")
+        AutoRefreshLog.i(context, "WeRead wallpaper stats start mode=$mode baseTime=${baseTimeSeconds ?: 0L} key=${maskKey(key)}")
         return try {
             val body = JSONObject()
                 .put("api_name", "/readdata/detail")
                 .put("mode", mode)
                 .put("skill_version", SKILL_VERSION)
-                .toString()
-            val result = postJson(key, body)
-            AutoRefreshLog.i(context, "WeRead wallpaper stats http mode=$mode code=${result.code} bytes=${result.body.length}")
+            if (baseTimeSeconds != null && baseTimeSeconds > 0L && mode != "overall") {
+                body.put("baseTime", baseTimeSeconds)
+            }
+            val result = postJson(key, body.toString())
+            AutoRefreshLog.i(context, "WeRead wallpaper stats http mode=$mode baseTime=${baseTimeSeconds ?: 0L} code=${result.code} bytes=${result.body.length}")
             if (result.code !in 200..299) {
                 return WallpaperStatsResult(false, "读取失败", "HTTP ${result.code}: ${result.body.take(120)}", mode, 0L, 0L, 0, emptyList(), emptyList())
             }

@@ -34,6 +34,14 @@ object AutoWallpaperGenerator {
 
     private data class BookItem(val title: String, val author: String?, val progress: String?, val status: Int)
     private data class ChartStats(val totalMs: Long, val points: LongArray, val labels: List<String>)
+    private data class WeReadBuildData(
+        val rangeStart: Long,
+        val rangeEnd: Long,
+        val chart: ChartStats,
+        val books: List<BookItem>,
+        val label: String,
+        val note: String
+    )
     private enum class BucketMode { HOUR, DAY, WEEK, MONTH }
 
     private data class AutoSettings(
@@ -104,25 +112,19 @@ object AutoWallpaperGenerator {
     fun buildWeReadStatsPreviewFromPrefs(context: Context, sourceMark: String = "W"): PreviewResult? {
         return runCatching {
             val s = readSettings(context)
-            val wp = context.getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
-            val mode = wp.getString("weread_stats_mode", "monthly") ?: "monthly"
-            val stats = WeReadClient.fetchWallpaperStats(context, WeReadClient.loadApiKey(context), mode)
-            if (!stats.ok) {
-                AutoRefreshLog.i(context, "WeRead wallpaper preview failed ${stats.detail}")
+            val data = buildWeReadStatsForSettings(context, s)
+            if (data == null) {
+                AutoRefreshLog.i(context, "WeRead wallpaper preview failed: no range data")
                 return@runCatching null
             }
-            val range = weReadRange(stats)
-            val chart = weReadChartStats(stats, mode)
-            val books = stats.books
-                .take(s.topN)
-                .map { BookItem(it.title, it.author, WeReadClient.formatSeconds(it.readSeconds), 1) }
-            val bmp = draw(context, range.first, range.second, chart, books, s, sourceMark)
+            val bmp = draw(context, data.rangeStart, data.rangeEnd, data.chart, data.books, s, sourceMark)
             val summary = buildString {
                 append("微信读书 ")
-                append(WeReadClient.modeLabel(mode))
-                append(", 书籍=").append(books.size)
-                append(", 时长=").append(formatDuration(chart.totalMs, s.timeUnit))
+                append(data.label)
+                append(", 书籍=").append(data.books.size)
+                append(", 时长=").append(formatDuration(data.chart.totalMs, s.timeUnit))
                 append(", 输出=").append(canvasSizeText(s))
+                if (data.note.isNotBlank()) append(", ").append(data.note)
             }
             PreviewResult(bmp, summary)
         }.getOrNull()
@@ -188,6 +190,102 @@ object AutoWallpaperGenerator {
     private fun canvasSizeText(s: AutoSettings): String {
         val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
         return "${preset.label} ${preset.widthPx}x${preset.heightPx}"
+    }
+
+    private fun buildWeReadStatsForSettings(context: Context, s: AutoSettings): WeReadBuildData? {
+        val range = resolvePeriodRange(s) ?: return null
+        val monthStarts = monthStartsBetween(range.first, range.second)
+        if (monthStarts.isEmpty()) return null
+        if (monthStarts.size > 24) {
+            AutoRefreshLog.i(context, "WeRead range too large months=${monthStarts.size} period=${s.periodMode}")
+            return null
+        }
+
+        val key = WeReadClient.loadApiKey(context)
+        val bucketMap = linkedMapOf<Long, Long>()
+        val bookMap = linkedMapOf<String, WeReadClient.WallpaperBook>()
+        monthStarts.forEach { monthStart ->
+            val stats = WeReadClient.fetchWallpaperStats(context, key, "monthly", monthStart / 1000L)
+            if (!stats.ok) {
+                AutoRefreshLog.i(context, "WeRead range fetch failed period=${s.periodMode} month=${fmt(monthStart)} detail=${stats.detail}")
+                return null
+            }
+            stats.buckets.forEach { (bucketSec, seconds) ->
+                val bucketStart = startOfDayMs(bucketSec * 1000L)
+                if (bucketStart in range.first..range.second) {
+                    bucketMap[bucketStart] = (bucketMap[bucketStart] ?: 0L) + seconds
+                }
+            }
+            stats.books.forEach { book ->
+                val id = "${book.title.trim()}|${book.author.trim()}"
+                val old = bookMap[id]
+                bookMap[id] = if (old == null) {
+                    book
+                } else {
+                    old.copy(readSeconds = old.readSeconds + book.readSeconds)
+                }
+            }
+        }
+
+        val sortedBuckets = bucketMap.toSortedMap()
+        val values = sortedBuckets.values.map { it * 1000L }.toLongArray()
+        val labels = sortedBuckets.keys.map { SimpleDateFormat("MM-dd", Locale.US).format(Date(it)) }
+        val totalMs = values.sum()
+        val chart = ChartStats(
+            totalMs = totalMs,
+            points = if (values.isNotEmpty()) values else longArrayOf(0L),
+            labels = if (labels.isNotEmpty()) labels else listOf(weReadPeriodLabel(s.periodMode))
+        )
+        val books = bookMap.values
+            .sortedByDescending { it.readSeconds }
+            .take(s.topN)
+            .map { BookItem(it.title, it.author, WeReadClient.formatSeconds(it.readSeconds), 1) }
+        val note = if (monthStarts.size > 1 || s.periodMode != "LAST_30_DAYS") {
+            "时长按日分桶精确过滤，书单按覆盖月份排行合并"
+        } else {
+            "时长按日分桶过滤"
+        }
+        AutoRefreshLog.i(context, "WeRead range stats period=${s.periodMode} range=${fmt(range.first)}~${fmt(range.second)} months=${monthStarts.size} buckets=${sortedBuckets.size} totalSec=${totalMs / 1000L} books=${books.size}")
+        return WeReadBuildData(range.first, range.second, chart, books, weReadPeriodLabel(s.periodMode), note)
+    }
+
+    private fun weReadPeriodLabel(periodMode: String): String {
+        return when (periodMode) {
+            "TODAY" -> "当天"
+            "YESTERDAY" -> "昨天"
+            "THIS_WEEK" -> "本周"
+            "LAST_WEEK" -> "上周"
+            "LAST_7_DAYS" -> "最近7天"
+            "LAST_30_DAYS" -> "最近30天"
+            "CUSTOM" -> "自定义周期"
+            else -> periodMode
+        }
+    }
+
+    private fun monthStartsBetween(startMs: Long, endMs: Long): List<Long> {
+        val out = mutableListOf<Long>()
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        cal.timeInMillis = startMs
+        cal.set(Calendar.DAY_OF_MONTH, 1)
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        while (cal.timeInMillis <= endMs) {
+            out.add(cal.timeInMillis)
+            cal.add(Calendar.MONTH, 1)
+        }
+        return out
+    }
+
+    private fun startOfDayMs(ms: Long): Long {
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        cal.timeInMillis = ms
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 
     private fun weReadRange(stats: WeReadClient.WallpaperStatsResult): Pair<Long, Long> {

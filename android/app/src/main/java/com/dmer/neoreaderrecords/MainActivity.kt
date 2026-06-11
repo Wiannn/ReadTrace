@@ -1396,7 +1396,6 @@ class MainActivity : ComponentActivity() {
         saveSettings(settings)
         saveAndApplyAutoRefreshSettings()
         if (settings.sourceMode == DataSourceMode.WEREAD) {
-            saveWeReadStatsModeForSettings(settings)
             previewPresetText = BooxDevicePresets.byKey(settings.booxDevicePreset).displayText()
             statusText.text = "微信读书来源已保存\n请点击“刷新预览”或“生成壁纸”获取最新微信读书内容。"
             changeStateText.text = "状态: 微信读书参数已变更（未联网）｜尺寸: $previewPresetText"
@@ -1602,21 +1601,16 @@ class MainActivity : ComponentActivity() {
         return mode
     }
 
-    private fun weReadStatsModeForPeriod(periodMode: PeriodMode): String {
+    private fun weReadPeriodLabel(periodMode: PeriodMode): String {
         return when (periodMode) {
-            PeriodMode.LAST_30_DAYS -> "monthly"
-            PeriodMode.CUSTOM -> "monthly"
-            else -> "weekly"
+            PeriodMode.TODAY -> "当天"
+            PeriodMode.YESTERDAY -> "昨天"
+            PeriodMode.THIS_WEEK -> "本周"
+            PeriodMode.LAST_WEEK -> "上周"
+            PeriodMode.LAST_7_DAYS -> "最近7天"
+            PeriodMode.LAST_30_DAYS -> "最近30天"
+            PeriodMode.CUSTOM -> "自定义周期"
         }
-    }
-
-    private fun saveWeReadStatsModeForSettings(settings: Settings): String {
-        val mode = weReadStatsModeForPeriod(settings.periodMode)
-        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
-            .edit()
-            .putString("weread_stats_mode", mode)
-            .apply()
-        return mode
     }
 
     private fun testWeReadStats() {
@@ -1669,11 +1663,11 @@ class MainActivity : ComponentActivity() {
         saveWeReadApiKeyFromUi()
         val settings = readSettingsFromUi()
         saveSettings(settings)
-        val mode = saveWeReadStatsModeForSettings(settings)
+        val periodLabel = weReadPeriodLabel(settings.periodMode)
         isTestingWeRead = true
         changeStateText.text = "状态: 正在生成微信账单预览..."
         if (::wereadStatusText.isInitialized) {
-            wereadStatusText.text = "微信读书：正在按统计周期生成${WeReadClient.modeLabel(mode)}账单预览..."
+            wereadStatusText.text = "微信读书：正在生成${periodLabel}账单预览..."
         }
         Thread {
             val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
@@ -1684,12 +1678,12 @@ class MainActivity : ComponentActivity() {
                     previewPresetText = BooxDevicePresets.byKey(readSettingsFromUi().booxDevicePreset).displayText()
                     statusText.text = "微信账单预览已更新（未写入文件）\n${preview.summary}"
                     changeStateText.text = "状态: 微信账单预览已更新｜尺寸: $previewPresetText"
-                    lastWeReadWallpaperDebug = "ok=true, mode=$mode, summary=${preview.summary}"
+                    lastWeReadWallpaperDebug = "ok=true, period=$periodLabel, summary=${preview.summary}"
                     refreshPreview()
                     showPreviewPage()
                 } else {
                     changeStateText.text = "状态: 微信账单预览失败"
-                    lastWeReadWallpaperDebug = "ok=false, mode=$mode"
+                    lastWeReadWallpaperDebug = "ok=false, period=$periodLabel"
                 }
                 if (::wereadStatusText.isInitialized) {
                     wereadStatusText.text = "${wereadStatusText.text}\n账单预览：${lastWeReadWallpaperDebug.take(180)}"
@@ -1705,11 +1699,11 @@ class MainActivity : ComponentActivity() {
         saveWeReadApiKeyFromUi()
         val settings = readSettingsFromUi()
         saveSettings(settings)
-        val mode = saveWeReadStatsModeForSettings(settings)
+        val periodLabel = weReadPeriodLabel(settings.periodMode)
         isTestingWeRead = true
         changeStateText.text = "状态: 正在生成微信账单壁纸..."
         if (::wereadStatusText.isInitialized) {
-            wereadStatusText.text = "微信读书：正在按统计周期生成并保存${WeReadClient.modeLabel(mode)}账单..."
+            wereadStatusText.text = "微信读书：正在生成并保存${periodLabel}账单..."
         }
         Thread {
             val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
@@ -1722,12 +1716,12 @@ class MainActivity : ComponentActivity() {
                     previewPresetText = BooxDevicePresets.byKey(readSettingsFromUi().booxDevicePreset).displayText()
                     statusText.text = "微信账单已生成并覆盖文件\n${preview.summary}\n路径: $saved"
                     changeStateText.text = "状态: 微信账单已生成并保存｜尺寸: $previewPresetText"
-                    lastWeReadWallpaperDebug = "ok=true, mode=$mode, saved=$saved, summary=${preview.summary}"
+                    lastWeReadWallpaperDebug = "ok=true, period=$periodLabel, saved=$saved, summary=${preview.summary}"
                     refreshPreview()
                     showPreviewPage()
                 } else {
                     changeStateText.text = "状态: 微信账单生成失败"
-                    lastWeReadWallpaperDebug = "ok=false, mode=$mode, saved=<none>"
+                    lastWeReadWallpaperDebug = "ok=false, period=$periodLabel, saved=<none>"
                 }
                 if (::wereadStatusText.isInitialized) {
                     wereadStatusText.text = "${wereadStatusText.text}\n账单生成：${lastWeReadWallpaperDebug.take(180)}"
