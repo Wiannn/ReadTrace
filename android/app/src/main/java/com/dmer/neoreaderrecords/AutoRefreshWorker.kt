@@ -40,12 +40,14 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
                 return Result.success()
             }
             AutoRefreshLog.i(applicationContext, "Worker WeRead prewarm accepted: reason=$reason delta=${wereadDelta}ms")
+            prefs.edit()
+                .putLong(AutoRefreshConfig.KEY_WEREAD_LAST_PREWARM_MS, now)
+                .apply()
             AutoRefreshLog.i(applicationContext, "Worker WeRead wait network settle 3500ms before request")
             Thread.sleep(3_500L)
             val ok = AutoWallpaperGenerator.generateAndSaveWeRead(applicationContext, reason)
             if (ok) {
                 prefs.edit()
-                    .putLong(AutoRefreshConfig.KEY_WEREAD_LAST_PREWARM_MS, now)
                     .putLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, now)
                     .putString(AutoRefreshConfig.KEY_LAST_REASON, reason)
                     .apply()

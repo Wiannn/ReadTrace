@@ -110,6 +110,12 @@ object AutoWallpaperGenerator {
         return runCatching {
             val s = readSettings(context)
             val built = buildWeReadPreviewForWallpaperMode(context, s.wallpaperMode) ?: return false
+            if ((reason == "screen_on_prewarm" || reason == "user_present_prewarm") &&
+                built.summary.contains("source=fallback_cache")
+            ) {
+                AutoRefreshLog.i(context, "WeRead auto skip saving fallback cache and request retry ${built.summary}")
+                return false
+            }
             val path = saveBitmap(context, built.bitmap)
             AutoRefreshLog.i(context, "WeRead auto saved path=$path ${built.summary}")
             true
@@ -148,11 +154,13 @@ object AutoWallpaperGenerator {
         return runCatching {
             val s = readSettings(context)
             val fetched = WeReadClient.cacheLatestCover(context, WeReadClient.loadApiKey(context))
+            var usedFallbackCache = false
             val cover = if (fetched.ok) {
                 fetched
             } else {
                 val cached = WeReadClient.cachedLatestCover(context)
                 if (cached != null) {
+                    usedFallbackCache = true
                     AutoRefreshLog.i(context, "WeRead cover wallpaper fallback cached detail=${fetched.detail.take(120)}")
                     cached
                 } else {
@@ -169,7 +177,13 @@ object AutoWallpaperGenerator {
             val summary = buildString {
                 append("微信读书封面 title=").append(cover.title)
                 append(", author=").append(cover.author)
-                append(", source=").append(if (cover.fromCache) "cache" else "network")
+                append(", source=").append(
+                    when {
+                        usedFallbackCache -> "fallback_cache"
+                        cover.fromCache -> "cache"
+                        else -> "network"
+                    }
+                )
                 append(", fit=").append(s.coverFitMode)
                 append(", 输出=").append(canvasSizeText(s))
             }
