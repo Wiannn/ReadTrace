@@ -1531,6 +1531,7 @@ class MainActivity : ComponentActivity() {
         val lastReason = when (lastReasonRaw) {
             "screen_off" -> "熄屏触发"
             "screen_on_prewarm" -> "亮屏预热"
+            "user_present_prewarm" -> "解锁预热"
             "book_content_changed" -> "内容变化"
             "daily_alarm" -> "每日定时"
             "" -> "暂无"

@@ -21,6 +21,7 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
         val prefs = applicationContext.getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
         val wallpaperMode = prefs.getString("wallpaper_mode", "STATS") ?: "STATS"
         val sourceMode = prefs.getString("source_mode", "DURATION") ?: "DURATION"
+        AutoRefreshLog.i(applicationContext, "Worker config sourceMode=$sourceMode wallpaperMode=$wallpaperMode")
         val now = System.currentTimeMillis()
         val minIntervalMs = AutoRefreshConfig.minIntervalMinutes(applicationContext) * 60_000L
         val lastMs = prefs.getLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, 0L)
@@ -39,6 +40,8 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
                 return Result.success()
             }
             AutoRefreshLog.i(applicationContext, "Worker WeRead prewarm accepted: reason=$reason delta=${wereadDelta}ms")
+            AutoRefreshLog.i(applicationContext, "Worker WeRead wait network settle 3500ms before request")
+            Thread.sleep(3_500L)
             val ok = AutoWallpaperGenerator.generateAndSaveWeRead(applicationContext, reason)
             if (ok) {
                 prefs.edit()
