@@ -125,6 +125,25 @@ object AutoWallpaperGenerator {
         }
     }
 
+    fun generateAndSaveMixed(context: Context, reason: String): Boolean {
+        AutoRefreshLog.i(context, "Mixed auto generator start reason=$reason")
+        return runCatching {
+            val built = buildMixedPreviewFromPrefs(context, "A") ?: return false
+            if ((reason.startsWith("screen_on_prewarm") || reason.startsWith("user_present_prewarm")) &&
+                built.summary.contains("source=fallback_cache")
+            ) {
+                AutoRefreshLog.i(context, "Mixed auto skip saving fallback cache and request retry ${built.summary}")
+                return false
+            }
+            val path = saveBitmap(context, built.bitmap)
+            AutoRefreshLog.i(context, "Mixed auto saved path=$path ${built.summary}")
+            true
+        }.getOrElse {
+            AutoRefreshLog.e(context, "Mixed auto generator exception", it)
+            false
+        }
+    }
+
     fun buildPreviewFromPrefs(context: Context, sourceMark: String = "M"): PreviewResult? {
         return runCatching { buildPreviewInternal(context, sourceMark, false) }.getOrNull()
     }
@@ -188,6 +207,29 @@ object AutoWallpaperGenerator {
                 append(", 输出=").append(canvasSizeText(s))
             }
             PreviewResult(rendered, summary)
+        }.getOrNull()
+    }
+
+    fun buildMixedPreviewFromPrefs(context: Context, sourceMark: String = "A"): PreviewResult? {
+        return runCatching {
+            val s = readSettings(context)
+            val tryCover = s.wallpaperMode == "COVER" || s.wallpaperMode == "AUTO_COVER"
+            if (tryCover) {
+                buildWeReadCoverPreviewFromPrefs(context, sourceMark)?.let {
+                    return@runCatching PreviewResult(it.bitmap, "混合封面：微信读书优先，${it.summary}")
+                }
+                tryBuildCoverWallpaper(context, s.copy(sourceMode = "DURATION"), sourceMark)?.let {
+                    return@runCatching PreviewResult(it.bitmap, "混合封面：本地回退，${it.summary}")
+                }
+                if (s.wallpaperMode == "COVER") return@runCatching null
+            }
+
+            val data = buildMixedStatsForSettings(context, s) ?: return@runCatching null
+            val bmp = draw(context, data.rangeStart, data.rangeEnd, data.chart, data.books, s, sourceMark)
+            PreviewResult(
+                bmp,
+                "混合统计 范围=${fmt(data.rangeStart)}~${fmt(data.rangeEnd)}, 书籍=${data.books.size}, 时长=${formatDuration(data.chart.totalMs, s.timeUnit)}, ${data.note}, 输出=${canvasSizeText(s)}"
+            )
         }.getOrNull()
     }
 
@@ -284,6 +326,130 @@ object AutoWallpaperGenerator {
         }
         AutoRefreshLog.i(context, "WeRead range stats period=${s.periodMode} range=${fmt(range.first)}~${fmt(range.second)} months=${monthStarts.size} buckets=${sortedBuckets.size} totalSec=${totalMs / 1000L} books=${books.size}")
         return WeReadBuildData(range.first, range.second, chart, books, weReadPeriodLabel(s.periodMode), note)
+    }
+
+    private fun buildMixedStatsForSettings(context: Context, s: AutoSettings): WeReadBuildData? {
+        val range = resolvePeriodRange(s) ?: return null
+        val localEvents = collectDurationEvents(context.contentResolver, range.first, range.second, s.minDurationMinutes)
+        val weReadEvents = mutableListOf<Pair<Long, Long>>()
+        val weReadBookScores = linkedMapOf<String, Pair<WeReadClient.WallpaperBook, Long>>()
+        val monthStarts = monthStartsBetween(range.first, range.second)
+        val key = WeReadClient.loadApiKey(context)
+        monthStarts.forEach { monthStart ->
+            val stats = WeReadClient.fetchWallpaperStats(context, key, "monthly", monthStart / 1000L)
+            if (!stats.ok) {
+                AutoRefreshLog.i(context, "Mixed WeRead fetch failed month=${fmt(monthStart)} detail=${stats.detail}")
+                return null
+            }
+            stats.buckets.forEach { (bucketSec, seconds) ->
+                val bucketStart = startOfDayMs(bucketSec * 1000L)
+                if (bucketStart in range.first..range.second) {
+                    weReadEvents.add(bucketStart to seconds * 1000L)
+                }
+            }
+            stats.books.forEach { book ->
+                val id = "${book.title.trim()}|${book.author.trim()}"
+                val old = weReadBookScores[id]
+                val newMs = book.readSeconds * 1000L
+                weReadBookScores[id] = if (old == null) {
+                    book to newMs
+                } else {
+                    old.first.copy(readSeconds = old.first.readSeconds + book.readSeconds) to (old.second + newMs)
+                }
+            }
+        }
+
+        val chart = bucketize(localEvents + weReadEvents, range.first, range.second, chooseBucketMode(s, range.first, range.second))
+        val localBooks = queryTopBooksByDuration(context.contentResolver, range.first, range.second, s)
+            .map { it.first to it.second }
+        val weReadBooks = weReadBookScores.values.map { (book, scoreMs) ->
+            BookItem(book.title, book.author, formatDuration(scoreMs, s.timeUnit), 1) to scoreMs
+        }
+        val mergedBooks = mergeScoredBooks(localBooks + weReadBooks, s.topN, s.timeUnit)
+        val note = "本地+微信，图表按时间相加，书单按阅读时长合并排序"
+        AutoRefreshLog.i(
+            context,
+            "Mixed stats range=${fmt(range.first)}~${fmt(range.second)} localEvents=${localEvents.size} weReadEvents=${weReadEvents.size} totalMs=${chart.totalMs} books=${mergedBooks.size}"
+        )
+        return WeReadBuildData(range.first, range.second, chart, mergedBooks, "混合", note)
+    }
+
+    private fun queryTopBooksByDuration(
+        resolver: ContentResolver,
+        start: Long,
+        end: Long,
+        s: AutoSettings
+    ): List<Pair<BookItem, Long>> {
+        val durationByPath = linkedMapOf<String, Long>()
+        val minMs = s.minDurationMinutes * 60_000L
+        resolver.query(
+            statsUri,
+            arrayOf("path", "durationTime"),
+            "eventTime >= ? AND eventTime <= ? AND path IS NOT NULL AND path != '' AND durationTime IS NOT NULL AND durationTime != '' AND durationTime != '0'",
+            arrayOf(start.toString(), end.toString()),
+            null
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val path = c.getString(c.getColumnIndexOrThrow("path")).orEmpty()
+                val dur = c.getString(c.getColumnIndexOrThrow("durationTime"))?.toLongOrNull() ?: 0L
+                if (path.isBlank() || dur < minMs) continue
+                durationByPath[path] = (durationByPath[path] ?: 0L) + dur
+            }
+        }
+        if (durationByPath.isEmpty()) return queryTopBooks(
+            resolver,
+            start,
+            end,
+            s.topN,
+            s.includeUnread,
+            s.readingFilterMode
+        ).mapIndexed { idx, item -> item to ((s.topN - idx).coerceAtLeast(1) * 60_000L).toLong() }
+
+        val metadata = linkedMapOf<String, BookItem>()
+        resolver.query(
+            metadataUri,
+            arrayOf("nativeAbsolutePath", "title", "authors", "progress", "readingStatus"),
+            null,
+            null,
+            null
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val path = c.getString(c.getColumnIndexOrThrow("nativeAbsolutePath")).orEmpty()
+                if (path.isBlank()) continue
+                val status = c.getString(c.getColumnIndexOrThrow("readingStatus"))?.toIntOrNull() ?: 0
+                if (!s.includeUnread && status == 0) continue
+                if (s.readingFilterMode == "READING_ONLY" && status != 1) continue
+                if (s.readingFilterMode == "FINISHED_ONLY" && status != 2) continue
+                metadata[path] = BookItem(
+                    c.getString(c.getColumnIndexOrThrow("title")) ?: File(path).nameWithoutExtension,
+                    c.getString(c.getColumnIndexOrThrow("authors")),
+                    c.getString(c.getColumnIndexOrThrow("progress")),
+                    status
+                )
+            }
+        }
+        return durationByPath.mapNotNull { (path, ms) ->
+            val item = metadata[path] ?: BookItem(File(path).nameWithoutExtension, null, null, 1)
+            item.copy(progress = formatDuration(ms, s.timeUnit)) to ms
+        }.sortedByDescending { it.second }
+    }
+
+    private fun mergeScoredBooks(items: List<Pair<BookItem, Long>>, limit: Int, unit: String): List<BookItem> {
+        val merged = linkedMapOf<String, Pair<BookItem, Long>>()
+        items.forEach { (book, score) ->
+            val key = "${book.title.trim()}|${book.author.orEmpty().trim()}"
+            val old = merged[key]
+            merged[key] = if (old == null) {
+                book to score
+            } else {
+                val total = old.second + score
+                old.first.copy(progress = formatDuration(total, unit)) to total
+            }
+        }
+        return merged.values
+            .sortedByDescending { it.second }
+            .take(limit)
+            .map { it.first }
     }
 
     private fun weReadPeriodLabel(periodMode: String): String {

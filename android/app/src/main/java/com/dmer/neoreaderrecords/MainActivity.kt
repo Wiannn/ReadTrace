@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
 
     data class BookItem(val title: String, val author: String?, val progress: String?, val status: Int, val path: String?)
 
-    enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS, WEREAD }
+    enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS, WEREAD, MIXED }
     enum class PeriodMode { TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
     enum class ReadingFilterMode { ALL, READING_ONLY, FINISHED_ONLY }
     enum class ChartStyleMode { LINE, BAR }
@@ -913,9 +913,10 @@ class MainActivity : ComponentActivity() {
 
         val sourceOptions = listOf(
             1001 to "Neo 阅读器\n读取文石本地阅读记录",
-            1004 to "微信读书\n联网读取微信统计与封面"
+            1004 to "微信读书\n联网读取微信统计与封面",
+            1005 to "混合来源\n合并本地和微信数据"
         )
-        val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.WEREAD.name)
+        val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.WEREAD.name, DataSourceMode.MIXED.name)
         sourceGroup = makeRadioGroup(sourceOptions, selectedId(prefs.getString("source_mode", DataSourceMode.DURATION.name) ?: DataSourceMode.DURATION.name, 1001, sourceOptions, sourceNames))
 
         val wallpaperOptions = listOf(1201 to "统计壁纸\n生成阅读账单图片", 1202 to "当前阅读封面\n使用当前来源的最近封面", 1203 to "自动封面优先\n有封面用封面，否则用账单")
@@ -1025,7 +1026,7 @@ class MainActivity : ComponentActivity() {
         val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
         addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。")
         val sourceSegment = bindSegmented("数据来源", sourceGroup, sourceOptions, isVertical = true)
-        addHint("说明：Neo 阅读器读取文石本地数据库，适合离线使用，熄屏或本地书籍变化时刷新；微信读书需要联网读取 API，解锁后会等待网络恢复并最多重试 5 次，成功后覆盖保存壁纸。")
+        addHint("说明：Neo 阅读器读取文石本地数据库，适合离线使用；微信读书需要联网读取 API；混合来源会把本地和微信的统计时长相加，书单按阅读时长合并排序，封面优先使用微信最近封面，失败时回退本地封面。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
         val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单。提示：Neo 封面依赖本地元数据落库，通常退出当前书籍后再锁屏更容易刷新；微信封面在解锁后生成，通常下一次锁屏显示最新结果。")
         val coverFitSegment = bindSegmented("封面显示方式", coverFitModeGroup, coverFitOptions, isVertical = false)
@@ -1400,12 +1401,13 @@ class MainActivity : ComponentActivity() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
         saveAndApplyAutoRefreshSettings()
-        if (settings.sourceMode == DataSourceMode.WEREAD) {
+        if (settings.sourceMode == DataSourceMode.WEREAD || settings.sourceMode == DataSourceMode.MIXED) {
             previewPresetText = BooxDevicePresets.byKey(settings.booxDevicePreset).displayText()
-            statusText.text = "微信读书来源已保存\n请点击“刷新预览”或“生成壁纸”获取最新微信读书内容。"
-            changeStateText.text = "状态: 微信读书参数已变更（未联网）｜尺寸: $previewPresetText"
+            val label = if (settings.sourceMode == DataSourceMode.MIXED) "混合来源" else "微信读书来源"
+            statusText.text = "$label 已保存\n请点击“刷新预览”或“生成壁纸”获取最新内容。"
+            changeStateText.text = "状态: $label 参数已变更（未联网）｜尺寸: $previewPresetText"
             refreshPreview()
-            writeDebugLog("weread_source_settings_saved")
+            writeDebugLog(if (settings.sourceMode == DataSourceMode.MIXED) "mixed_source_settings_saved" else "weread_source_settings_saved")
             return
         }
         val (bmp, result) = renderWallpaperPreview(settings)
@@ -1474,7 +1476,7 @@ class MainActivity : ComponentActivity() {
 
     private fun generateAndSaveFromCurrentSettings() {
         val settings = readSettingsFromUi()
-        if (settings.sourceMode == DataSourceMode.WEREAD) {
+        if (settings.sourceMode == DataSourceMode.WEREAD || settings.sourceMode == DataSourceMode.MIXED) {
             generateWeReadWallpaper()
             return
         }
@@ -1707,25 +1709,26 @@ class MainActivity : ComponentActivity() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
         val periodLabel = weReadPeriodLabel(settings.periodMode)
+        val sourceLabel = if (settings.sourceMode == DataSourceMode.MIXED) "混合来源" else "微信读书"
         isTestingWeRead = true
-        changeStateText.text = "状态: 正在生成微信账单预览..."
+        changeStateText.text = "状态: 正在生成${sourceLabel}预览..."
         if (::wereadStatusText.isInitialized) {
-            wereadStatusText.text = "微信读书：正在生成${periodLabel}账单预览..."
+            wereadStatusText.text = "$sourceLabel：正在生成${periodLabel}预览..."
         }
         Thread {
-            val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
+            val preview = buildSourcePreviewForWallpaperMode(settings)
             runOnUiThread {
                 isTestingWeRead = false
                 if (preview != null) {
                     previewBitmap = preview.bitmap
                     previewPresetText = BooxDevicePresets.byKey(readSettingsFromUi().booxDevicePreset).displayText()
-                    statusText.text = "微信账单预览已更新（未写入文件）\n${preview.summary}"
-                    changeStateText.text = "状态: 微信账单预览已更新｜尺寸: $previewPresetText"
+                    statusText.text = "${sourceLabel}预览已更新（未写入文件）\n${preview.summary}"
+                    changeStateText.text = "状态: ${sourceLabel}预览已更新｜尺寸: $previewPresetText"
                     lastWeReadWallpaperDebug = "ok=true, period=$periodLabel, summary=${preview.summary}"
                     refreshPreview()
                     showPreviewPage()
                 } else {
-                    changeStateText.text = "状态: 微信账单预览失败"
+                    changeStateText.text = "状态: ${sourceLabel}预览失败"
                     lastWeReadWallpaperDebug = "ok=false, period=$periodLabel"
                 }
                 if (::wereadStatusText.isInitialized) {
@@ -1743,13 +1746,14 @@ class MainActivity : ComponentActivity() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
         val periodLabel = weReadPeriodLabel(settings.periodMode)
+        val sourceLabel = if (settings.sourceMode == DataSourceMode.MIXED) "混合来源" else "微信读书"
         isTestingWeRead = true
-        changeStateText.text = "状态: 正在生成微信账单壁纸..."
+        changeStateText.text = "状态: 正在生成${sourceLabel}壁纸..."
         if (::wereadStatusText.isInitialized) {
-            wereadStatusText.text = "微信读书：正在生成并保存${periodLabel}账单..."
+            wereadStatusText.text = "$sourceLabel：正在生成并保存${periodLabel}壁纸..."
         }
         Thread {
-            val preview = buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
+            val preview = buildSourcePreviewForWallpaperMode(settings)
             runOnUiThread {
                 isTestingWeRead = false
                 if (preview != null) {
@@ -1757,13 +1761,13 @@ class MainActivity : ComponentActivity() {
                     previewBitmap = preview.bitmap
                     lastSavedPath = saved
                     previewPresetText = BooxDevicePresets.byKey(readSettingsFromUi().booxDevicePreset).displayText()
-                    statusText.text = "微信账单已生成并覆盖文件\n${preview.summary}\n路径: $saved"
-                    changeStateText.text = "状态: 微信账单已生成并保存｜尺寸: $previewPresetText"
+                    statusText.text = "${sourceLabel}壁纸已生成并覆盖文件\n${preview.summary}\n路径: $saved"
+                    changeStateText.text = "状态: ${sourceLabel}壁纸已生成并保存｜尺寸: $previewPresetText"
                     lastWeReadWallpaperDebug = "ok=true, period=$periodLabel, saved=$saved, summary=${preview.summary}"
                     refreshPreview()
                     showPreviewPage()
                 } else {
-                    changeStateText.text = "状态: 微信账单生成失败"
+                    changeStateText.text = "状态: ${sourceLabel}生成失败"
                     lastWeReadWallpaperDebug = "ok=false, period=$periodLabel, saved=<none>"
                 }
                 if (::wereadStatusText.isInitialized) {
@@ -1781,6 +1785,14 @@ class MainActivity : ComponentActivity() {
             "AUTO_COVER" -> AutoWallpaperGenerator.buildWeReadCoverPreviewFromPrefs(applicationContext, "W")
                 ?: AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
             else -> AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+        }
+    }
+
+    private fun buildSourcePreviewForWallpaperMode(settings: Settings): AutoWallpaperGenerator.PreviewResult? {
+        return if (settings.sourceMode == DataSourceMode.MIXED) {
+            AutoWallpaperGenerator.buildMixedPreviewFromPrefs(applicationContext, "A")
+        } else {
+            buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
         }
     }
 
@@ -1879,7 +1891,7 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshPreviewData() {
         val settings = readSettingsFromUi()
-        if (settings.sourceMode == DataSourceMode.WEREAD) {
+        if (settings.sourceMode == DataSourceMode.WEREAD || settings.sourceMode == DataSourceMode.MIXED) {
             previewWeReadWallpaper()
             collectMetadataDebugSample()
             showPreviewPage()
@@ -1976,6 +1988,7 @@ class MainActivity : ComponentActivity() {
             1002 -> DataSourceMode.PATH_SESSION
             1003 -> DataSourceMode.METADATA_ACCESS
             1004 -> DataSourceMode.WEREAD
+            1005 -> DataSourceMode.MIXED
             else -> DataSourceMode.DURATION
         }
         val wallpaperMode = when (wallpaperModeGroup.checkedRadioButtonId) {

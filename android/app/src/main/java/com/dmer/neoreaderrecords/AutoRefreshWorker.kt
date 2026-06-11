@@ -27,32 +27,32 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
         val lastMs = prefs.getLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, 0L)
         val delta = now - lastMs
 
-        if (sourceMode == "WEREAD") {
+        if (sourceMode == "WEREAD" || sourceMode == "MIXED") {
             if (reason != "screen_on_prewarm" && reason != "user_present_prewarm") {
-                AutoRefreshLog.i(applicationContext, "Worker skip WeRead source on reason=$reason")
+                AutoRefreshLog.i(applicationContext, "Worker skip remote source=$sourceMode on reason=$reason")
                 return Result.success()
             }
             val wereadPrewarmMinMs = 5_000L
             val wereadLastMs = prefs.getLong(AutoRefreshConfig.KEY_WEREAD_LAST_PREWARM_MS, 0L)
             val wereadDelta = now - wereadLastMs
             if (wereadDelta < wereadPrewarmMinMs) {
-                AutoRefreshLog.i(applicationContext, "Worker skip WeRead duplicate prewarm: reason=$reason delta=${wereadDelta}ms < $wereadPrewarmMinMs ms")
+                AutoRefreshLog.i(applicationContext, "Worker skip remote duplicate prewarm: source=$sourceMode reason=$reason delta=${wereadDelta}ms < $wereadPrewarmMinMs ms")
                 return Result.success()
             }
-            AutoRefreshLog.i(applicationContext, "Worker WeRead prewarm accepted: reason=$reason delta=${wereadDelta}ms")
+            AutoRefreshLog.i(applicationContext, "Worker remote prewarm accepted: source=$sourceMode reason=$reason delta=${wereadDelta}ms")
             prefs.edit()
                 .putLong(AutoRefreshConfig.KEY_WEREAD_LAST_PREWARM_MS, now)
                 .apply()
-            val ok = runWeReadWithNetworkRetries(reason)
+            val ok = runRemoteWithNetworkRetries(reason, sourceMode)
             if (ok) {
                 prefs.edit()
                     .putLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, now)
                     .putString(AutoRefreshConfig.KEY_LAST_REASON, reason)
                     .apply()
-                AutoRefreshLog.i(applicationContext, "Worker success saved WeRead")
+                AutoRefreshLog.i(applicationContext, "Worker success saved remote source=$sourceMode")
                 return Result.success()
             }
-            AutoRefreshLog.i(applicationContext, "Worker WeRead failed -> retry")
+            AutoRefreshLog.i(applicationContext, "Worker remote failed -> retry source=$sourceMode")
             return Result.retry()
         }
 
@@ -98,7 +98,7 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
         return Result.retry()
     }
 
-    private fun runWeReadWithNetworkRetries(reason: String): Boolean {
+    private fun runRemoteWithNetworkRetries(reason: String, sourceMode: String): Boolean {
         val maxAttempts = 5
         val firstDelayMs = 3_500L
         val retryDelayMs = 3_000L
@@ -106,15 +106,20 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
             val delayMs = if (attempt == 1) firstDelayMs else retryDelayMs
             AutoRefreshLog.i(
                 applicationContext,
-                "Worker WeRead wait network settle ${delayMs}ms before request attempt=$attempt/$maxAttempts"
+                "Worker remote wait network settle ${delayMs}ms before request source=$sourceMode attempt=$attempt/$maxAttempts"
             )
             Thread.sleep(delayMs)
-            val ok = AutoWallpaperGenerator.generateAndSaveWeRead(applicationContext, "$reason#$attempt")
+            val taggedReason = "$reason#$attempt"
+            val ok = if (sourceMode == "MIXED") {
+                AutoWallpaperGenerator.generateAndSaveMixed(applicationContext, taggedReason)
+            } else {
+                AutoWallpaperGenerator.generateAndSaveWeRead(applicationContext, taggedReason)
+            }
             if (ok) {
-                AutoRefreshLog.i(applicationContext, "Worker WeRead attempt success attempt=$attempt/$maxAttempts")
+                AutoRefreshLog.i(applicationContext, "Worker remote attempt success source=$sourceMode attempt=$attempt/$maxAttempts")
                 return true
             }
-            AutoRefreshLog.i(applicationContext, "Worker WeRead attempt failed attempt=$attempt/$maxAttempts")
+            AutoRefreshLog.i(applicationContext, "Worker remote attempt failed source=$sourceMode attempt=$attempt/$maxAttempts")
         }
         return false
     }
