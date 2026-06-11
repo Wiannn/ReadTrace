@@ -40,6 +40,11 @@ object AutoWallpaperGenerator {
         val progressText: String? = null,
         val durationText: String? = null
     )
+    private data class MetadataBook(
+        val path: String,
+        val lastAccessMs: Long,
+        val item: BookItem
+    )
     private data class ChartStats(val totalMs: Long, val points: LongArray, val labels: List<String>)
     private data class WeReadBuildData(
         val rangeStart: Long,
@@ -317,7 +322,7 @@ object AutoWallpaperGenerator {
         }
         val range = resolvePeriodRange(s) ?: return null
         val books = if (s.sourceMode == "DURATION") {
-            queryTopBooksByDuration(context.contentResolver, range.first, range.second, s)
+            queryTopBooksByDuration(context, range.first, range.second, s)
                 .take(s.topN)
                 .map { it.first }
         } else {
@@ -435,7 +440,7 @@ object AutoWallpaperGenerator {
         }
 
         val chart = bucketize(localEvents + weReadEvents, range.first, range.second, chooseBucketMode(s, range.first, range.second))
-        val localBooks = queryTopBooksByDuration(context.contentResolver, range.first, range.second, s)
+        val localBooks = queryTopBooksByDuration(context, range.first, range.second, s)
             .map { it.first to it.second }
         val weReadBooks = weReadBookScores.values.map { (book, scoreMs) ->
             toWeReadBookItem(context, key, book).copy(durationText = formatDuration(scoreMs, s.timeUnit)) to scoreMs
@@ -450,40 +455,43 @@ object AutoWallpaperGenerator {
     }
 
     private fun queryTopBooksByDuration(
-        resolver: ContentResolver,
+        context: Context,
         start: Long,
         end: Long,
         s: AutoSettings
     ): List<Pair<BookItem, Long>> {
+        val resolver = context.contentResolver
         val durationByPath = linkedMapOf<String, Long>()
+        val orphanEvents = mutableListOf<Pair<Long, Long>>()
         val minMs = s.minDurationMinutes * 60_000L
+        var statsRows = 0
+        var statsRowsWithPath = 0
         resolver.query(
             statsUri,
-            arrayOf("path", "durationTime"),
-            "eventTime >= ? AND eventTime <= ? AND path IS NOT NULL AND path != '' AND durationTime IS NOT NULL AND durationTime != '' AND durationTime != '0'",
+            arrayOf("path", "eventTime", "durationTime"),
+            "eventTime >= ? AND eventTime <= ? AND durationTime IS NOT NULL AND durationTime != '' AND durationTime != '0'",
             arrayOf(start.toString(), end.toString()),
             null
         )?.use { c ->
             while (c.moveToNext()) {
+                statsRows += 1
                 val path = c.getString(c.getColumnIndexOrThrow("path")).orEmpty()
+                val event = c.getString(c.getColumnIndexOrThrow("eventTime"))?.toLongOrNull() ?: 0L
                 val dur = c.getString(c.getColumnIndexOrThrow("durationTime"))?.toLongOrNull() ?: 0L
-                if (path.isBlank() || dur < minMs) continue
-                durationByPath[path] = (durationByPath[path] ?: 0L) + dur
+                if (dur < minMs) continue
+                if (path.isBlank()) {
+                    if (event > 0L) orphanEvents.add(normalizeEpochMs(event) to dur)
+                } else {
+                    statsRowsWithPath += 1
+                    durationByPath[path] = (durationByPath[path] ?: 0L) + dur
+                }
             }
         }
-        if (durationByPath.isEmpty()) return queryTopBooks(
-            resolver,
-            start,
-            end,
-            s.topN,
-            s.includeUnread,
-            s.readingFilterMode
-        ).mapIndexed { idx, item -> item to ((s.topN - idx).coerceAtLeast(1) * 60_000L).toLong() }
 
-        val metadata = linkedMapOf<String, BookItem>()
+        val metadata = linkedMapOf<String, MetadataBook>()
         resolver.query(
             metadataUri,
-            arrayOf("nativeAbsolutePath", "title", "authors", "progress", "readingStatus"),
+            arrayOf("nativeAbsolutePath", "title", "authors", "progress", "readingStatus", "lastAccess"),
             null,
             null,
             null
@@ -495,16 +503,59 @@ object AutoWallpaperGenerator {
                 if (!s.includeUnread && status == 0) continue
                 if (s.readingFilterMode == "READING_ONLY" && status != 1) continue
                 if (s.readingFilterMode == "FINISHED_ONLY" && status != 2) continue
-                metadata[path] = BookItem(
-                    c.getString(c.getColumnIndexOrThrow("title")) ?: File(path).nameWithoutExtension,
-                    c.getString(c.getColumnIndexOrThrow("authors")),
-                    c.getString(c.getColumnIndexOrThrow("progress")),
-                    status
+                metadata[path] = MetadataBook(
+                    path = path,
+                    lastAccessMs = normalizeEpochMs(c.getString(c.getColumnIndexOrThrow("lastAccess"))?.toLongOrNull() ?: 0L),
+                    item = BookItem(
+                        c.getString(c.getColumnIndexOrThrow("title")) ?: File(path).nameWithoutExtension,
+                        c.getString(c.getColumnIndexOrThrow("authors")),
+                        c.getString(c.getColumnIndexOrThrow("progress")),
+                        status
+                    )
                 )
             }
         }
+
+        var timeMatched = 0
+        var timeUnmatched = 0
+        if (orphanEvents.isNotEmpty() && metadata.isNotEmpty()) {
+            val candidates = metadata.values
+                .filter { it.lastAccessMs > 0L }
+                .ifEmpty { metadata.values.toList() }
+            val maxDelta = when {
+                end - start <= DAY_MS -> 12L * 60L * 60L * 1000L
+                end - start <= 8L * DAY_MS -> 3L * DAY_MS
+                else -> 10L * DAY_MS
+            }
+            orphanEvents.forEach { (eventMs, dur) ->
+                val best = candidates.minByOrNull {
+                    val access = if (it.lastAccessMs > 0L) it.lastAccessMs else start
+                    kotlin.math.abs(access - eventMs)
+                }
+                val bestAccess = best?.lastAccessMs ?: 0L
+                val delta = if (best != null && bestAccess > 0L) kotlin.math.abs(bestAccess - eventMs) else Long.MAX_VALUE
+                if (best != null && delta <= maxDelta) {
+                    durationByPath[best.path] = (durationByPath[best.path] ?: 0L) + dur
+                    timeMatched += 1
+                } else {
+                    timeUnmatched += 1
+                }
+            }
+        }
+
+        AutoRefreshLog.i(context, "Local duration book match rows=$statsRows rowsWithPath=$statsRowsWithPath orphan=${orphanEvents.size} timeMatched=$timeMatched timeUnmatched=$timeUnmatched metadata=${metadata.size} durationBooks=${durationByPath.size}")
+
+        if (durationByPath.isEmpty()) return queryTopBooks(
+            resolver,
+            start,
+            end,
+            s.topN,
+            s.includeUnread,
+            s.readingFilterMode
+        ).mapIndexed { idx, item -> item to ((s.topN - idx).coerceAtLeast(1) * 60_000L).toLong() }
+
         return durationByPath.mapNotNull { (path, ms) ->
-            val item = metadata[path] ?: BookItem(File(path).nameWithoutExtension, null, null, 1)
+            val item = metadata[path]?.item ?: BookItem(File(path).nameWithoutExtension, null, null, 1)
             item.copy(durationText = formatDuration(ms, s.timeUnit)) to ms
         }.sortedByDescending { it.second }
     }
