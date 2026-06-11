@@ -316,8 +316,18 @@ object AutoWallpaperGenerator {
             if (s.wallpaperMode == "COVER") return null
         }
         val range = resolvePeriodRange(s) ?: return null
-        val books = queryTopBooks(context.contentResolver, range.first, range.second, s.topN, s.includeUnread, s.readingFilterMode)
+        val books = if (s.sourceMode == "DURATION") {
+            queryTopBooksByDuration(context.contentResolver, range.first, range.second, s)
+                .take(s.topN)
+                .map { it.first }
+        } else {
+            queryTopBooks(context.contentResolver, range.first, range.second, s.topN, s.includeUnread, s.readingFilterMode)
+        }
         val stats = queryStatsByMode(context.contentResolver, range.first, range.second, s)
+        AutoRefreshLog.i(
+            context,
+            "Local stats books source=${s.sourceMode} books=${books.size} withDuration=${books.count { !it.durationText.isNullOrBlank() }}"
+        )
         val bmp = draw(context, range.first, range.second, stats, books, s, sourceMark)
         val summary = buildString {
             append("范围=").append(fmt(range.first)).append("~").append(fmt(range.second))
