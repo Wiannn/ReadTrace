@@ -913,12 +913,12 @@ class MainActivity : ComponentActivity() {
 
         val sourceOptions = listOf(
             1001 to "Neo 阅读器\n读取文石本地阅读记录",
-            1004 to "微信读书\n使用微信读书统计与封面"
+            1004 to "微信读书\n联网读取微信统计与封面"
         )
         val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.WEREAD.name)
         sourceGroup = makeRadioGroup(sourceOptions, selectedId(prefs.getString("source_mode", DataSourceMode.DURATION.name) ?: DataSourceMode.DURATION.name, 1001, sourceOptions, sourceNames))
 
-        val wallpaperOptions = listOf(1201 to "统计壁纸\n生成阅读账单图片", 1202 to "当前阅读封面\n尝试用最近书籍封面", 1203 to "自动封面优先\n有封面用封面，否则用账单")
+        val wallpaperOptions = listOf(1201 to "统计壁纸\n生成阅读账单图片", 1202 to "当前阅读封面\n使用当前来源的最近封面", 1203 to "自动封面优先\n有封面用封面，否则用账单")
         val wallpaperNames = listOf("STATS", "COVER", "AUTO_COVER")
         wallpaperModeGroup = makeRadioGroup(wallpaperOptions, selectedId(prefs.getString("wallpaper_mode", "STATS") ?: "STATS", 1201, wallpaperOptions, wallpaperNames))
 
@@ -1025,9 +1025,9 @@ class MainActivity : ComponentActivity() {
         val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
         addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。")
         val sourceSegment = bindSegmented("数据来源", sourceGroup, sourceOptions, isVertical = true)
-        addHint("说明：切换本地/微信来源后，请先手动点一次“生成壁纸”写入当前来源的图片；之后本地 Neo 阅读器的熄屏刷新会继续按本地记录工作。微信读书不参与熄屏自动刷新，避免锁屏时联网耗电。")
+        addHint("说明：Neo 阅读器读取文石本地数据库，适合离线使用，熄屏或本地书籍变化时刷新；微信读书需要联网读取 API，解锁后会等待网络恢复并最多重试 5 次，成功后覆盖保存壁纸。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
-        val wallpaperModeHint = addHint("说明：统计壁纸最稳定；封面模式只读取本地书籍封面，不访问网络。提示：封面模式依赖 NeoReader 元数据落库。通常需要先退出当前正在阅读的书籍再锁屏，才会刷新到最新封面；如果在书籍打开状态下直接锁屏，往往仍显示旧封面，通常下一次锁屏才会生效。")
+        val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单。提示：Neo 封面依赖本地元数据落库，通常退出当前书籍后再锁屏更容易刷新；微信封面在解锁后生成，通常下一次锁屏显示最新结果。")
         val coverFitSegment = bindSegmented("封面显示方式", coverFitModeGroup, coverFitOptions, isVertical = false)
         val timeUnitSegment = bindSegmented("时长显示单位", timeUnitGroup, timeUnitOptions, isVertical = false)
         addHint("说明：小时模式更适合壁纸阅读，分钟模式更适合精确核对。")
@@ -1123,7 +1123,7 @@ class MainActivity : ComponentActivity() {
         }
         val autoWarningText = addHint("提示：熄屏触发会增加唤醒次数与耗电；NeoReader 常在退出当前书籍/会话落库后才更新元数据，所以可能出现“本次锁屏仍是旧封面、下次锁屏生效”的现象。")
 
-        addSectionTitle("微信读书", "第一阶段只配置 Key 并测试连接，不参与壁纸生成")
+        addSectionTitle("微信读书", "配置 API Key，支持手动生成与解锁预热刷新")
         wereadApiKeyInput = makeInput(WeReadClient.loadApiKey(this))
         val wereadKeyRow = bindSecretEditRow("API Key", wereadApiKeyInput)
         val wereadStatsModeOptions = listOf(9001 to "本周\nweekly", 9002 to "本月\nmonthly", 9003 to "今年\nannually", 9004 to "总计\noverall")
@@ -1178,7 +1178,7 @@ class MainActivity : ComponentActivity() {
             text = "生成微信账单测试"
             setOnClickListener { generateWeReadWallpaper() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
-        addHint("说明：连接测试调用 /shelf/sync；统计、预览和生成微信账单调用 /readdata/detail；封面测试会下载最近阅读书籍封面到 App 缓存目录。当前微信账单生成只支持手动点击，会覆盖保存到 Pictures/NeoReader/neoreader_wallpaper.png，暂不参与熄屏自动刷新。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
+        addHint("说明：连接和最近封面会调用 /shelf/sync；统计壁纸会调用 /readdata/detail；封面会缓存到 App 私有目录。选择“数据来源=微信读书”后，手动预览/生成会立即联网；自动模式下不在熄屏时联网，而是在解锁后预热刷新，网络未恢复会短间隔重试，成功后覆盖保存到 Pictures/NeoReader/neoreader_wallpaper.png。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
         renderWeReadState(WeReadClient.cachedState(this))
 
         addSectionTitle("版本与更新", "GitHub Release 分发与更新检查")
