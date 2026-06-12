@@ -131,6 +131,7 @@ class MainActivity : ComponentActivity() {
     private var fontPermissionDebug: String = ""
     private var metadataDebugReport: String = ""
     private var metadataRowsDebugReport: String = ""
+    private var localCalendarProbeReport: String = ""
     private var uiDebugReport: String = ""
     private var isCheckingUpdates: Boolean = false
     private var isTestingWeRead: Boolean = false
@@ -158,6 +159,23 @@ class MainActivity : ComponentActivity() {
     }
 
     data class BookItem(val title: String, val author: String?, val progress: String?, val status: Int, val path: String?)
+    private data class CalendarMetaBook(
+        val path: String,
+        val title: String,
+        val author: String,
+        val lastAccessMs: Long,
+        val hasCoverHint: Boolean
+    )
+    private data class CalendarDayStat(
+        var events: Int = 0,
+        var withPath: Int = 0,
+        var orphan: Int = 0,
+        var matched: Int = 0,
+        var unmatched: Int = 0,
+        var durationMs: Long = 0L,
+        val books: LinkedHashMap<String, Long> = linkedMapOf(),
+        val coverBooks: LinkedHashSet<String> = linkedSetOf()
+    )
 
     enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS, WEREAD, MIXED }
     enum class PeriodMode { TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
@@ -1956,6 +1974,180 @@ class MainActivity : ComponentActivity() {
             metadataDebugReport = "error=${it.javaClass.simpleName}:${it.message}"
             metadataRowsDebugReport = "<error>"
         }
+        collectLocalCalendarDebugProbe()
+    }
+
+    private fun collectLocalCalendarDebugProbe() {
+        runCatching {
+            val now = System.currentTimeMillis()
+            val end = endOfDayMs(now)
+            val start = startOfDayMs(now - 29L * 24L * 60L * 60L * 1000L)
+            val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val metaByPath = linkedMapOf<String, CalendarMetaBook>()
+            val metaByName = linkedMapOf<String, CalendarMetaBook>()
+            contentResolver.query(
+                metadataUri,
+                arrayOf("nativeAbsolutePath", "title", "authors", "lastAccess", "coverUrl", "extraInfo", "downloadInfo"),
+                null,
+                null,
+                null
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    fun col(name: String): String {
+                        val i = c.getColumnIndex(name)
+                        if (i < 0 || c.isNull(i)) return ""
+                        return runCatching { c.getString(i) ?: "" }.getOrDefault("")
+                    }
+                    val path = col("nativeAbsolutePath")
+                    if (path.isBlank()) continue
+                    val title = col("title").ifBlank { File(path).nameWithoutExtension }
+                    val author = col("authors")
+                    val lastAccess = normalizeEpochMs(col("lastAccess").toLongOrNull() ?: 0L)
+                    val coverHint = listOf("coverUrl", "extraInfo", "downloadInfo").any { col(it).isNotBlank() } || hasExtractedCoverCache(path)
+                    val book = CalendarMetaBook(path, title, author, lastAccess, coverHint)
+                    metaByPath[path] = book
+                    metaByName[File(path).name] = book
+                }
+            }
+
+            val days = linkedMapOf<Long, CalendarDayStat>()
+            for (i in 0 until 30) {
+                days[start + i * 24L * 60L * 60L * 1000L] = CalendarDayStat()
+            }
+            var statsRows = 0
+            var statsRowsWithPath = 0
+            var exactMatches = 0
+            var nameMatches = 0
+            var timeMatches = 0
+            var unmatched = 0
+            contentResolver.query(
+                statsUri,
+                arrayOf("path", "eventTime", "durationTime"),
+                "eventTime >= ? AND eventTime <= ? AND durationTime IS NOT NULL AND durationTime != '' AND durationTime != '0'",
+                arrayOf(start.toString(), end.toString()),
+                null
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    fun col(name: String): String {
+                        val i = c.getColumnIndex(name)
+                        if (i < 0 || c.isNull(i)) return ""
+                        return runCatching { c.getString(i) ?: "" }.getOrDefault("")
+                    }
+                    statsRows += 1
+                    val path = col("path")
+                    val eventMs = normalizeEpochMs(col("eventTime").toLongOrNull() ?: 0L)
+                    val dur = col("durationTime").toLongOrNull() ?: 0L
+                    if (eventMs <= 0L || dur <= 0L) continue
+                    val dayStart = startOfDayMs(eventMs)
+                    val day = days.getOrPut(dayStart) { CalendarDayStat() }
+                    day.events += 1
+                    day.durationMs += dur
+                    val matchedBook = if (path.isNotBlank()) {
+                        statsRowsWithPath += 1
+                        day.withPath += 1
+                        metaByPath[path]?.also { exactMatches += 1 }
+                            ?: metaByName[File(path).name]?.also { nameMatches += 1 }
+                    } else {
+                        day.orphan += 1
+                        null
+                    } ?: findNearestCalendarBook(metaByPath.values, eventMs)?.also {
+                        timeMatches += 1
+                    }
+
+                    if (matchedBook == null) {
+                        day.unmatched += 1
+                        unmatched += 1
+                    } else {
+                        day.matched += 1
+                        day.books[matchedBook.title] = (day.books[matchedBook.title] ?: 0L) + dur
+                        if (matchedBook.hasCoverHint) day.coverBooks.add(matchedBook.title)
+                    }
+                }
+            }
+
+            val out = StringBuilder()
+            out.append("range=").append(dateFmt.format(Date(start))).append("~").append(dateFmt.format(Date(end))).append('\n')
+            out.append("statsRows=").append(statsRows)
+                .append(", rowsWithPath=").append(statsRowsWithPath)
+                .append(", metadata=").append(metaByPath.size)
+                .append(", exactMatches=").append(exactMatches)
+                .append(", nameMatches=").append(nameMatches)
+                .append(", timeMatches=").append(timeMatches)
+                .append(", unmatched=").append(unmatched)
+                .append('\n')
+            days.entries.forEach { (dayStart, stat) ->
+                if (stat.events == 0 && stat.books.isEmpty()) return@forEach
+                val top = stat.books.entries
+                    .sortedByDescending { it.value }
+                    .take(4)
+                    .joinToString(" | ") { "${it.key.take(24)}:${formatMinutesForDebug(it.value)}" }
+                    .ifBlank { "<no-book-match>" }
+                out.append(dateFmt.format(Date(dayStart)))
+                    .append(" events=").append(stat.events)
+                    .append(", withPath=").append(stat.withPath)
+                    .append(", orphan=").append(stat.orphan)
+                    .append(", matched=").append(stat.matched)
+                    .append(", unmatched=").append(stat.unmatched)
+                    .append(", total=").append(formatMinutesForDebug(stat.durationMs))
+                    .append(", coverBooks=").append(stat.coverBooks.size)
+                    .append(", top=").append(top)
+                    .append('\n')
+            }
+            localCalendarProbeReport = out.toString().ifBlank { "<empty>" }
+        }.onFailure {
+            localCalendarProbeReport = "error=${it.javaClass.simpleName}:${it.message}"
+        }
+    }
+
+    private fun findNearestCalendarBook(books: Collection<CalendarMetaBook>, eventMs: Long): CalendarMetaBook? {
+        val maxDelta = 12L * 60L * 60L * 1000L
+        var best: CalendarMetaBook? = null
+        var bestDelta = Long.MAX_VALUE
+        books.forEach { book ->
+            if (book.lastAccessMs <= 0L) return@forEach
+            val delta = kotlin.math.abs(book.lastAccessMs - eventMs)
+            if (delta < bestDelta) {
+                best = book
+                bestDelta = delta
+            }
+        }
+        return if (bestDelta <= maxDelta) best else null
+    }
+
+    private fun hasExtractedCoverCache(path: String): Boolean {
+        if (path.isBlank()) return false
+        val f = File(path)
+        val cacheFile = File(File(cacheDir, "extracted_covers"), "${path.hashCode()}_${f.lastModified()}.jpg")
+        return cacheFile.exists() && cacheFile.length() > 0L
+    }
+
+    private fun normalizeEpochMs(value: Long): Long {
+        return when {
+            value <= 0L -> 0L
+            value < 10_000_000_000L -> value * 1000L
+            else -> value
+        }
+    }
+
+    private fun startOfDayMs(ms: Long): Long {
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        cal.timeInMillis = ms
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    private fun endOfDayMs(ms: Long): Long {
+        return startOfDayMs(ms) + 24L * 60L * 60L * 1000L - 1L
+    }
+
+    private fun formatMinutesForDebug(ms: Long): String {
+        val minutes = (ms / 60_000L).coerceAtLeast(0L)
+        val hours = minutes / 60L
+        val remain = minutes % 60L
+        return if (hours > 0L) "${hours}h${remain}m" else "${minutes}m"
     }
 
     private fun refreshPreview() {
@@ -2246,6 +2438,7 @@ class MainActivity : ComponentActivity() {
 
     private fun writeDebugLog(event: String) {
         try {
+            if (localCalendarProbeReport.isBlank()) collectLocalCalendarDebugProbe()
             val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             if (!dir.exists()) dir.mkdirs()
             val f = File(dir, debugLogName)
@@ -2308,6 +2501,7 @@ class MainActivity : ComponentActivity() {
                 w.append("barcodeDebug=").append(barcodeDebugReport.ifBlank { "<empty>" }).append('\n')
                 w.append("metadataDebug=").append(metadataDebugReport.ifBlank { "<empty>" }).append('\n')
                 w.append("metadataRowsDebug=").append('\n').append(metadataRowsDebugReport.ifBlank { "<empty>" }).append('\n')
+                w.append("localCalendarProbe=").append('\n').append(localCalendarProbeReport.ifBlank { "<empty>" }).append('\n')
                 val persisted = contentResolver.persistedUriPermissions
                 w.append("persistedUriPermissions=").append(persisted.size.toString()).append('\n')
                 persisted.forEachIndexed { i, p ->
