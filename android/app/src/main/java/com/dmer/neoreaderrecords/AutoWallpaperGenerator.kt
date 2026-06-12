@@ -415,11 +415,13 @@ object AutoWallpaperGenerator {
         val weReadBookScores = linkedMapOf<String, Pair<WeReadClient.WallpaperBook, Long>>()
         val monthStarts = monthStartsBetween(range.first, range.second)
         val key = WeReadClient.loadApiKey(context)
+        val weReadFailures = mutableListOf<String>()
         monthStarts.forEach { monthStart ->
             val stats = WeReadClient.fetchWallpaperStats(context, key, "monthly", monthStart / 1000L)
             if (!stats.ok) {
                 AutoRefreshLog.i(context, "Mixed WeRead fetch failed month=${fmt(monthStart)} detail=${stats.detail}")
-                return null
+                weReadFailures.add("${fmt(monthStart)} ${stats.detail.take(80)}")
+                return@forEach
             }
             stats.buckets.forEach { (bucketSec, seconds) ->
                 val bucketStart = startOfDayMs(bucketSec * 1000L)
@@ -446,10 +448,16 @@ object AutoWallpaperGenerator {
             toWeReadBookItem(context, key, book).copy(durationText = formatDuration(scoreMs, s.timeUnit)) to scoreMs
         }
         val mergedBooks = mergeScoredBooks(localBooks + weReadBooks, s.topN, s.timeUnit)
-        val note = "本地+微信，图表按时间相加，书单按阅读时长合并排序"
+        val note = buildString {
+            append("本地+微信，图表按时间相加，书单按阅读时长合并排序")
+            if (weReadFailures.isNotEmpty()) {
+                append("；微信读书读取失败，已使用本地数据")
+                if (weReadEvents.isNotEmpty() || weReadBooks.isNotEmpty()) append("和已读取到的微信数据")
+            }
+        }
         AutoRefreshLog.i(
             context,
-            "Mixed stats range=${fmt(range.first)}~${fmt(range.second)} localEvents=${localEvents.size} weReadEvents=${weReadEvents.size} totalMs=${chart.totalMs} books=${mergedBooks.size}"
+            "Mixed stats range=${fmt(range.first)}~${fmt(range.second)} localEvents=${localEvents.size} weReadEvents=${weReadEvents.size} localBooks=${localBooks.size} weReadBooks=${weReadBooks.size} mergedBooks=${mergedBooks.size} weReadFailures=${weReadFailures.size} totalMs=${chart.totalMs}"
         )
         return WeReadBuildData(range.first, range.second, chart, mergedBooks, "混合", note)
     }
