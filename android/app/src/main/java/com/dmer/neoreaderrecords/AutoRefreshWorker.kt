@@ -23,10 +23,9 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
         val sourceMode = prefs.getString("source_mode", "DURATION") ?: "DURATION"
         AutoRefreshLog.i(applicationContext, "Worker config sourceMode=$sourceMode wallpaperMode=$wallpaperMode")
         val now = System.currentTimeMillis()
-        val minIntervalMinutes = AutoRefreshConfig.minIntervalMinutes(applicationContext)
+        val minIntervalMs = AutoRefreshConfig.minIntervalMinutes(applicationContext) * 60_000L
         val lastMs = prefs.getLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, 0L)
-        val lastContentMs = prefs.getLong(AutoRefreshConfig.KEY_LAST_CONTENT_TRIGGER_MS, 0L)
-        val lastBookKey = prefs.getString("auto_last_book_key", "") ?: ""
+        val delta = now - lastMs
 
         if (sourceMode == "WEREAD" || sourceMode == "MIXED") {
             if (reason != "screen_on_prewarm" && reason != "user_present_prewarm") {
@@ -87,14 +86,11 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
 
         val ok = AutoWallpaperGenerator.generateAndSave(applicationContext, reason)
         if (ok) {
-            val editor = prefs.edit()
+            prefs.edit()
                 .putLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, now)
                 .putString(AutoRefreshConfig.KEY_LAST_REASON, reason)
-                .putString("auto_last_book_key", decision.latestBookKey)
-            if (reason == "book_content_changed") {
-                editor.putLong(AutoRefreshConfig.KEY_LAST_CONTENT_TRIGGER_MS, now)
-            }
-            editor.apply()
+                .putString("auto_last_book_key", latestBookKey)
+                .apply()
             AutoRefreshLog.i(applicationContext, "Worker success saved")
             return Result.success()
         }
@@ -147,11 +143,7 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
 
     companion object {
         fun enqueue(context: Context, reason: String) {
-            val delaySeconds = when (reason) {
-                "screen_off", "screen_on_prewarm", "book_content_changed" -> 12L
-                else -> 0L
-            }
-            val reqBuilder = OneTimeWorkRequestBuilder<AutoRefreshWorker>()
+            val req = OneTimeWorkRequestBuilder<AutoRefreshWorker>()
                 .setInputData(androidx.work.Data.Builder().putString("reason", reason).build())
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setConstraints(
@@ -159,8 +151,7 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
                         .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
                         .build()
                 )
-            if (delaySeconds > 0) reqBuilder.setInitialDelay(delaySeconds, java.util.concurrent.TimeUnit.SECONDS)
-            val req = reqBuilder.build()
+                .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "neoreader_auto_refresh",
                 ExistingWorkPolicy.REPLACE,

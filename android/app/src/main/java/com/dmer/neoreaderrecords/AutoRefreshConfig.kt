@@ -11,9 +11,6 @@ object AutoRefreshConfig {
     const val KEY_LAST_TRIGGER_MS = "auto_last_trigger_ms"
     const val KEY_WEREAD_LAST_PREWARM_MS = "weread_last_prewarm_ms"
     const val KEY_LAST_REASON = "auto_last_reason"
-    const val KEY_LAST_CONTENT_TRIGGER_MS = "auto_last_content_trigger_ms"
-    const val KEY_ENABLE_CONTENT_OBSERVER = "auto_enable_content_observer"
-    const val KEY_ENABLE_SCREEN_ON_PREWARM = "auto_enable_screen_on_prewarm"
 
     const val MODE_DAILY = "DAILY"
     const val MODE_SCREEN_OFF = "SCREEN_OFF"
@@ -37,15 +34,5 @@ object AutoRefreshConfig {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_SCREEN_OFF_MIN_INTERVAL, 3)
             .coerceIn(1, 240)
-    }
-
-    fun enableContentObserver(context: Context): Boolean {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ENABLE_CONTENT_OBSERVER, false)
-    }
-
-    fun enableScreenOnPrewarm(context: Context): Boolean {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ENABLE_SCREEN_ON_PREWARM, false)
     }
 }
