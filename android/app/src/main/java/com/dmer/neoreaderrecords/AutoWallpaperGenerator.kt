@@ -45,6 +45,30 @@ object AutoWallpaperGenerator {
         val lastAccessMs: Long,
         val item: BookItem
     )
+    private data class CalendarCoverItem(
+        val title: String,
+        val author: String?,
+        val path: String,
+        val durationMs: Long,
+        val bitmap: Bitmap?
+    )
+    private data class CalendarDayCell(
+        val dayStartMs: Long,
+        val dayOfMonth: Int,
+        val inMonth: Boolean,
+        val totalMs: Long,
+        val eventCount: Int,
+        val unmatchedCount: Int,
+        val books: List<CalendarCoverItem>
+    )
+    private data class CalendarBuildData(
+        val monthStartMs: Long,
+        val monthEndMs: Long,
+        val cells: List<CalendarDayCell>,
+        val statsRows: Int,
+        val matchedRows: Int,
+        val unmatchedRows: Int
+    )
     private data class ChartStats(val totalMs: Long, val points: LongArray, val labels: List<String>)
     private data class WeReadBuildData(
         val rangeStart: Long,
@@ -223,9 +247,19 @@ object AutoWallpaperGenerator {
         }.getOrNull()
     }
 
+    fun buildLocalCalendarPreviewFromPrefs(context: Context, sourceMark: String = "M"): PreviewResult? {
+        return runCatching {
+            val s = readSettings(context)
+            buildLocalCalendarPreviewForSettings(context, s, sourceMark)
+        }.getOrNull()
+    }
+
     fun buildMixedPreviewFromPrefs(context: Context, sourceMark: String = "A"): PreviewResult? {
         return runCatching {
             val s = readSettings(context)
+            if (s.wallpaperMode == "CALENDAR") {
+                return@runCatching buildLocalCalendarPreviewForSettings(context, s, "M")
+            }
             val tryCover = s.wallpaperMode == "COVER" || s.wallpaperMode == "AUTO_COVER"
             if (tryCover) {
                 buildMixedCoverPreview(context, s, sourceMark)?.let {
@@ -248,6 +282,7 @@ object AutoWallpaperGenerator {
             "COVER" -> buildWeReadCoverPreviewFromPrefs(context, "W")
             "AUTO_COVER" -> buildWeReadCoverPreviewFromPrefs(context, "W")
                 ?: buildWeReadStatsPreviewFromPrefs(context, "W")
+            "CALENDAR" -> buildLocalCalendarPreviewFromPrefs(context, "M")
             else -> buildWeReadStatsPreviewFromPrefs(context, "W")
         }
     }
@@ -314,6 +349,9 @@ object AutoWallpaperGenerator {
 
     private fun buildPreviewInternal(context: Context, sourceMark: String, fromAutoWorker: Boolean): PreviewResult? {
         val s = readSettings(context)
+        if (s.wallpaperMode == "CALENDAR") {
+            return buildLocalCalendarPreviewForSettings(context, s, "M")
+        }
         val tryCover = s.wallpaperMode == "COVER" || (s.wallpaperMode == "AUTO_COVER" && fromAutoWorker)
         if (tryCover) {
             tryBuildCoverWallpaper(context, s, sourceMark)?.let { return it }
@@ -344,6 +382,172 @@ object AutoWallpaperGenerator {
             append(", 输出=").append(canvasSizeText(s))
         }
         return PreviewResult(bmp, summary)
+    }
+
+    private fun buildLocalCalendarPreviewForSettings(context: Context, s: AutoSettings, sourceMark: String): PreviewResult? {
+        val data = buildLocalCalendarData(context, s) ?: return null
+        val bmp = drawCalendarWallpaper(context, data, s, sourceMark)
+        val monthLabel = SimpleDateFormat("yyyy.MM", Locale.US).format(Date(data.monthStartMs))
+        val coveredDays = data.cells.count { it.inMonth && it.books.isNotEmpty() }
+        return PreviewResult(
+            bmp,
+            "月历封面墙 month=$monthLabel daysWithCover=$coveredDays rows=${data.statsRows} matched=${data.matchedRows} unmatched=${data.unmatchedRows} 输出=${canvasSizeText(s)}"
+        )
+    }
+
+    private fun buildLocalCalendarData(context: Context, s: AutoSettings): CalendarBuildData? {
+        val baseRange = resolvePeriodRange(s)
+        val baseMs = baseRange?.second ?: System.currentTimeMillis()
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        cal.timeInMillis = baseMs
+        cal.set(Calendar.DAY_OF_MONTH, 1)
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val monthStart = cal.timeInMillis
+        cal.add(Calendar.MONTH, 1)
+        cal.add(Calendar.MILLISECOND, -1)
+        val monthEnd = cal.timeInMillis
+
+        val gridCal = Calendar.getInstance(TimeZone.getDefault())
+        gridCal.timeInMillis = monthStart
+        val mondayIndex = (gridCal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+        gridCal.add(Calendar.DAY_OF_MONTH, -mondayIndex)
+        val gridStart = startOfDayMs(gridCal.timeInMillis)
+
+        val metadata = loadCalendarMetadata(context, s)
+        val metadataByPath = metadata.associateBy { it.path }
+        val candidates = metadata.filter { it.lastAccessMs > 0L }.ifEmpty { metadata }
+        val durationByDayPath = linkedMapOf<Long, LinkedHashMap<String, Long>>()
+        val eventsByDay = linkedMapOf<Long, Int>()
+        val unmatchedByDay = linkedMapOf<Long, Int>()
+        val minMs = s.minDurationMinutes * 60_000L
+        var rows = 0
+        var matchedRows = 0
+        var unmatchedRows = 0
+
+        context.contentResolver.query(
+            statsUri,
+            arrayOf("path", "eventTime", "durationTime"),
+            "eventTime >= ? AND eventTime <= ? AND durationTime IS NOT NULL AND durationTime != '' AND durationTime != '0'",
+            arrayOf(monthStart.toString(), monthEnd.toString()),
+            null
+        )?.use { c ->
+            while (c.moveToNext()) {
+                rows += 1
+                val rawEvent = readColString(c, "eventTime")?.toLongOrNull() ?: continue
+                val eventMs = normalizeEpochMs(rawEvent)
+                val durationMs = readColString(c, "durationTime")?.toLongOrNull() ?: 0L
+                if (durationMs < minMs) continue
+                val day = startOfDayMs(eventMs)
+                eventsByDay[day] = (eventsByDay[day] ?: 0) + 1
+                val rawPath = readColString(c, "path").orEmpty()
+                val matchedPath = when {
+                    rawPath.isNotBlank() && metadataByPath.containsKey(rawPath) -> rawPath
+                    rawPath.isNotBlank() -> rawPath
+                    else -> nearestMetadataPath(eventMs, candidates, monthStart, monthEnd)
+                }
+                if (matchedPath.isNullOrBlank()) {
+                    unmatchedRows += 1
+                    unmatchedByDay[day] = (unmatchedByDay[day] ?: 0) + 1
+                    continue
+                }
+                matchedRows += 1
+                val dayMap = durationByDayPath.getOrPut(day) { linkedMapOf() }
+                dayMap[matchedPath] = (dayMap[matchedPath] ?: 0L) + durationMs
+            }
+        }
+
+        val cells = (0 until 42).map { index ->
+            val dayMs = gridStart + index * DAY_MS
+            val dc = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = dayMs }
+            val inMonth = dayMs in monthStart..monthEnd
+            val dayMap = durationByDayPath[dayMs].orEmpty()
+            val books = dayMap.entries
+                .sortedByDescending { it.value }
+                .take(4)
+                .map { (path, ms) ->
+                    val meta = metadataByPath[path]
+                    CalendarCoverItem(
+                        title = meta?.item?.title ?: File(path).nameWithoutExtension.ifBlank { "未知书名" },
+                        author = meta?.item?.author,
+                        path = path,
+                        durationMs = ms,
+                        bitmap = loadCalendarCoverBitmap(context, path)
+                    )
+                }
+            CalendarDayCell(
+                dayStartMs = dayMs,
+                dayOfMonth = dc.get(Calendar.DAY_OF_MONTH),
+                inMonth = inMonth,
+                totalMs = dayMap.values.sum(),
+                eventCount = eventsByDay[dayMs] ?: 0,
+                unmatchedCount = unmatchedByDay[dayMs] ?: 0,
+                books = books
+            )
+        }
+        AutoRefreshLog.i(
+            context,
+            "calendar wallpaper data month=${fmt(monthStart)} rows=$rows metadata=${metadata.size} matched=$matchedRows unmatched=$unmatchedRows daysWithBooks=${cells.count { it.inMonth && it.books.isNotEmpty() }}"
+        )
+        return CalendarBuildData(monthStart, monthEnd, cells, rows, matchedRows, unmatchedRows)
+    }
+
+    private fun loadCalendarMetadata(context: Context, s: AutoSettings): List<MetadataBook> {
+        val out = mutableListOf<MetadataBook>()
+        context.contentResolver.query(metadataUri, null, null, null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val path = readColString(c, "nativeAbsolutePath").orEmpty()
+                if (path.isBlank()) continue
+                val status = readColString(c, "readingStatus")?.toIntOrNull() ?: 0
+                if (!s.includeUnread && status == 0) continue
+                if (s.readingFilterMode == "READING_ONLY" && status != 1) continue
+                if (s.readingFilterMode == "FINISHED_ONLY" && status != 2) continue
+                out.add(
+                    MetadataBook(
+                        path = path,
+                        lastAccessMs = normalizeEpochMs(readColString(c, "lastAccess")?.toLongOrNull() ?: 0L),
+                        item = BookItem(
+                            title = readColString(c, "title") ?: File(path).nameWithoutExtension.ifBlank { "未知书名" },
+                            author = readColString(c, "authors"),
+                            progress = readColString(c, "progress"),
+                            status = status
+                        )
+                    )
+                )
+            }
+        }
+        return out
+    }
+
+    private fun nearestMetadataPath(eventMs: Long, candidates: List<MetadataBook>, monthStart: Long, monthEnd: Long): String? {
+        if (candidates.isEmpty()) return null
+        val maxDelta = when {
+            monthEnd - monthStart <= 8L * DAY_MS -> 3L * DAY_MS
+            else -> 10L * DAY_MS
+        }
+        val best = candidates.minByOrNull { kotlin.math.abs(it.lastAccessMs - eventMs) } ?: return null
+        if (best.lastAccessMs <= 0L) return null
+        val delta = kotlin.math.abs(best.lastAccessMs - eventMs)
+        return if (delta <= maxDelta) best.path else null
+    }
+
+    private fun loadCalendarCoverBitmap(context: Context, path: String): Bitmap? {
+        if (path.isBlank()) return null
+        val file = File(path)
+        val cacheDir = File(context.cacheDir, "extracted_covers").apply { if (!exists()) mkdirs() }
+        val cacheFile = File(cacheDir, "${path.hashCode()}_${file.lastModified()}.jpg")
+        if (cacheFile.exists() && cacheFile.length() > 0L) {
+            BitmapFactory.decodeFile(cacheFile.absolutePath)?.let { return it }
+        }
+        val bmp = decodeCoverFromBookFileWithReason(path).bitmap ?: return null
+        runCatching {
+            FileOutputStream(cacheFile).use { out ->
+                bmp.compress(Bitmap.CompressFormat.JPEG, 88, out)
+            }
+        }
+        return bmp
     }
 
     private fun canvasSizeText(s: AutoSettings): String {
@@ -983,6 +1187,204 @@ object AutoWallpaperGenerator {
         // Keep cover mode visually clean: no bottom-left title overlay.
         drawSourceCornerMark(canvas, w, h, sourceMark, 1f)
         return out
+    }
+
+    private fun drawCalendarWallpaper(context: Context, data: CalendarBuildData, s: AutoSettings, sourceMark: String): Bitmap {
+        val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
+        val w = preset.widthPx
+        val h = preset.heightPx
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val bg = Color.rgb(247, 242, 234)
+        val paper = Color.rgb(252, 249, 243)
+        val ink = Color.rgb(35, 22, 20)
+        val muted = Color.rgb(128, 106, 101)
+        val accent = Color.rgb(170, 62, 52)
+        canvas.drawColor(bg)
+
+        val titleFace = resolveTypeface(context, s.titleFont, true)
+        val bodyFace = resolveTypeface(context, s.bodyFont, false)
+        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = muted
+            textSize = (w * 0.095f).coerceIn(72f, 152f)
+            typeface = Typeface.create(titleFace, Typeface.BOLD)
+        }
+        val arrow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = muted
+            textSize = (w * 0.09f).coerceIn(68f, 138f)
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        val weekPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = muted
+            textSize = (w * 0.034f).coerceIn(28f, 56f)
+            typeface = Typeface.create(bodyFace, Typeface.NORMAL)
+            textAlign = Paint.Align.CENTER
+        }
+        val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = ink
+            textSize = (w * 0.04f).coerceIn(34f, 62f)
+            typeface = Typeface.create(bodyFace, Typeface.NORMAL)
+        }
+        val smallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = muted
+            textSize = (w * 0.017f).coerceIn(16f, 28f)
+            typeface = Typeface.create(bodyFace, Typeface.NORMAL)
+        }
+        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(105, 80, 62, 58)
+            strokeWidth = (w * 0.0015f).coerceIn(1.5f, 3f)
+        }
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = paper
+            style = Paint.Style.FILL
+        }
+        val gridStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(60, 80, 62, 58)
+            style = Paint.Style.STROKE
+            strokeWidth = (w * 0.001f).coerceIn(1f, 2f)
+        }
+
+        val marginX = w * 0.055f
+        val top = h * 0.045f
+        val monthText = SimpleDateFormat("M/yyyy", Locale.US).format(Date(data.monthStartMs))
+        canvas.drawText(monthText, marginX, top + title.textSize, title)
+        canvas.drawText("‹", w - marginX - w * 0.22f, top + title.textSize * 0.98f, arrow)
+        canvas.drawText("›", w - marginX - w * 0.08f, top + title.textSize * 0.98f, arrow)
+
+        val gridTop = top + title.textSize + h * 0.06f
+        val gridLeft = marginX
+        val gridRight = w - marginX
+        val gridWidth = gridRight - gridLeft
+        val weekH = h * 0.072f
+        val gridBottom = h - h * 0.055f
+        val rowH = ((gridBottom - gridTop - weekH) / 6f).coerceAtLeast(100f)
+        val colW = gridWidth / 7f
+        val gridRect = RectF(gridLeft, gridTop, gridRight, gridTop + weekH + rowH * 6f)
+        canvas.drawRoundRect(gridRect, w * 0.018f, w * 0.018f, fill)
+        canvas.drawRoundRect(gridRect, w * 0.018f, w * 0.018f, gridStroke)
+
+        val weekdays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+        weekdays.forEachIndexed { i, label ->
+            weekPaint.color = if (i == 6) accent else muted
+            canvas.drawText(label, gridLeft + colW * (i + 0.5f), gridTop + weekH * 0.63f, weekPaint)
+        }
+        canvas.drawLine(gridLeft, gridTop + weekH, gridRight, gridTop + weekH, line)
+
+        for (r in 0 until 6) {
+            val y0 = gridTop + weekH + rowH * r
+            if (r > 0) canvas.drawLine(gridLeft, y0, gridRight, y0, line)
+            for (col in 0 until 7) {
+                val cell = data.cells[r * 7 + col]
+                val x0 = gridLeft + colW * col
+                if (col > 0) canvas.drawLine(x0, y0, x0, y0 + rowH, gridStroke)
+                val alpha = if (cell.inMonth) 255 else 70
+                dayPaint.color = if (col == 6) Color.argb(alpha, 200, 56, 48) else Color.argb(alpha, 48, 20, 20)
+                canvas.drawText(cell.dayOfMonth.toString(), x0 + colW * 0.08f, y0 + rowH * 0.22f, dayPaint)
+
+                if (cell.inMonth && cell.books.isNotEmpty()) {
+                    val coverArea = RectF(
+                        x0 + colW * 0.08f,
+                        y0 + rowH * 0.28f,
+                        x0 + colW * 0.92f,
+                        y0 + rowH * 0.82f
+                    )
+                    drawCalendarBookStack(canvas, coverArea, cell.books, bodyFace)
+                    if (cell.totalMs > 0L) {
+                        smallPaint.color = muted
+                        smallPaint.textAlign = Paint.Align.RIGHT
+                        canvas.drawText(compactDuration(cell.totalMs), x0 + colW * 0.92f, y0 + rowH * 0.94f, smallPaint)
+                    }
+                } else if (cell.inMonth && cell.eventCount > 0) {
+                    smallPaint.color = muted
+                    smallPaint.textAlign = Paint.Align.LEFT
+                    canvas.drawText("未匹配", x0 + colW * 0.08f, y0 + rowH * 0.52f, smallPaint)
+                }
+            }
+        }
+
+        val coveredDays = data.cells.count { it.inMonth && it.books.isNotEmpty() }
+        val note = "Neo 本地月历 · ${coveredDays}天有封面 · 近似匹配"
+        smallPaint.color = muted
+        smallPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText(note, marginX, h - h * 0.024f, smallPaint)
+        drawSourceCornerMark(canvas, w, h, sourceMark, 1f)
+        return out
+    }
+
+    private fun drawCalendarBookStack(canvas: Canvas, area: RectF, books: List<CalendarCoverItem>, bodyFace: Typeface) {
+        val count = books.size.coerceIn(1, 4)
+        val gap = area.width() * 0.045f
+        val coverW = when (count) {
+            1 -> area.width() * 0.68f
+            2 -> area.width() * 0.5f
+            else -> area.width() * 0.42f
+        }
+        val coverH = area.height()
+        val startX = when (count) {
+            1 -> area.left + (area.width() - coverW) / 2f
+            2 -> area.left + area.width() * 0.13f
+            else -> area.left + area.width() * 0.04f
+        }
+        books.take(count).forEachIndexed { i, book ->
+            val offset = i * (coverW * 0.34f + gap)
+            val topOffset = if (i % 2 == 0) 0f else area.height() * 0.08f
+            val rect = RectF(startX + offset, area.top + topOffset, startX + offset + coverW, area.top + topOffset + coverH * 0.9f)
+            if (book.bitmap != null) {
+                drawFittedBitmap(canvas, book.bitmap, rect)
+            } else {
+                drawCalendarPlaceholder(canvas, rect, book.title, bodyFace)
+            }
+            val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(115, 40, 28, 26)
+                style = Paint.Style.STROKE
+                strokeWidth = 1.4f
+            }
+            canvas.drawRect(rect, border)
+        }
+    }
+
+    private fun drawFittedBitmap(canvas: Canvas, bitmap: Bitmap, dst: RectF) {
+        val srcRatio = bitmap.width / bitmap.height.toFloat()
+        val dstRatio = dst.width() / dst.height()
+        val src = if (srcRatio > dstRatio) {
+            val newW = (bitmap.height * dstRatio).toInt()
+            val left = (bitmap.width - newW) / 2
+            android.graphics.Rect(left, 0, left + newW, bitmap.height)
+        } else {
+            val newH = (bitmap.width / dstRatio).toInt()
+            val top = (bitmap.height - newH) / 2
+            android.graphics.Rect(0, top, bitmap.width, top + newH)
+        }
+        canvas.drawBitmap(bitmap, src, dst, null)
+    }
+
+    private fun drawCalendarPlaceholder(canvas: Canvas, rect: RectF, title: String, bodyFace: Typeface) {
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(45, 32, 30)
+            textSize = (rect.width() * 0.17f).coerceIn(12f, 26f)
+            typeface = Typeface.create(bodyFace, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawRect(rect, fill)
+        val short = shortTitle(title, 4)
+        val base = rect.centerY() - (text.descent() + text.ascent()) / 2f
+        canvas.drawText(short, rect.centerX(), base, text)
+    }
+
+    private fun compactDuration(ms: Long): String {
+        val minutes = (ms / 60_000L).coerceAtLeast(0L)
+        return if (minutes >= 60L) {
+            val h = minutes / 60L
+            val m = minutes % 60L
+            if (m == 0L) "${h}h" else "${h}h${m}m"
+        } else {
+            "${minutes}m"
+        }
     }
 
     private fun readSettings(context: Context): AutoSettings {
