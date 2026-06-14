@@ -496,7 +496,33 @@ object AutoWallpaperGenerator {
             context,
             "calendar wallpaper data month=${fmt(monthStart)} rows=$rows metadata=${metadata.size} matched=$matchedRows unmatched=$unmatchedRows daysWithBooks=${cells.count { it.inMonth && it.books.isNotEmpty() }}"
         )
+        persistNeoCalendarEstimates(context, cells)
         return CalendarBuildData(monthStart, monthEnd, weekRows, cells, rows, matchedRows, unmatchedRows)
+    }
+
+    private fun persistNeoCalendarEstimates(context: Context, cells: List<CalendarDayCell>) {
+        val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val records = cells
+            .filter { it.inMonth && it.books.isNotEmpty() }
+            .flatMap { cell ->
+                cell.books.map { book ->
+                    ReadingDataStore.DailyBookRecord(
+                        date = dateFmt.format(Date(cell.dayStartMs)),
+                        source = "NEO",
+                        bookKey = book.path.ifBlank { book.title },
+                        title = book.title,
+                        author = book.author,
+                        coverCachePath = calendarCoverCachePath(context, book.path),
+                        durationMs = book.durationMs,
+                        progress = null,
+                        status = book.status,
+                        confidence = "ESTIMATED",
+                        lastSeenAt = cell.dayStartMs
+                    )
+                }
+            }
+        val written = ReadingDataStore.upsertDailyBooks(context, records, "neo_calendar_estimates")
+        AutoRefreshLog.i(context, "calendar persisted neo estimates records=${records.size} written=$written totalDb=${ReadingDataStore.countDailyBooks(context)}")
     }
 
     private fun loadCalendarMetadata(context: Context, s: AutoSettings): List<MetadataBook> {
@@ -541,8 +567,7 @@ object AutoWallpaperGenerator {
     private fun loadCalendarCoverBitmap(context: Context, path: String): Bitmap? {
         if (path.isBlank()) return null
         val file = File(path)
-        val cacheDir = File(context.cacheDir, "extracted_covers").apply { if (!exists()) mkdirs() }
-        val cacheFile = File(cacheDir, "${path.hashCode()}_${file.lastModified()}.jpg")
+        val cacheFile = File(calendarCoverCachePath(context, path).orEmpty())
         if (cacheFile.exists() && cacheFile.length() > 0L) {
             BitmapFactory.decodeFile(cacheFile.absolutePath)?.let { return it }
         }
@@ -553,6 +578,13 @@ object AutoWallpaperGenerator {
             }
         }
         return bmp
+    }
+
+    private fun calendarCoverCachePath(context: Context, path: String): String? {
+        if (path.isBlank()) return null
+        val file = File(path)
+        val cacheDir = File(context.cacheDir, "extracted_covers").apply { if (!exists()) mkdirs() }
+        return File(cacheDir, "${path.hashCode()}_${file.lastModified()}.jpg").absolutePath
     }
 
     private fun canvasSizeText(s: AutoSettings): String {
