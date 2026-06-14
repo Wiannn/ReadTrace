@@ -64,6 +64,7 @@ object AutoWallpaperGenerator {
     private data class CalendarBuildData(
         val monthStartMs: Long,
         val monthEndMs: Long,
+        val weekRows: Int,
         val cells: List<CalendarDayCell>,
         val statsRows: Int,
         val matchedRows: Int,
@@ -413,6 +414,8 @@ object AutoWallpaperGenerator {
         val gridCal = Calendar.getInstance(TimeZone.getDefault())
         gridCal.timeInMillis = monthStart
         val mondayIndex = (gridCal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+        val daysInMonth = cal.get(Calendar.DAY_OF_MONTH)
+        val weekRows = ((mondayIndex + daysInMonth + 6) / 7).coerceIn(5, 6)
         gridCal.add(Calendar.DAY_OF_MONTH, -mondayIndex)
         val gridStart = startOfDayMs(gridCal.timeInMillis)
 
@@ -459,7 +462,7 @@ object AutoWallpaperGenerator {
             }
         }
 
-        val cells = (0 until 42).map { index ->
+        val cells = (0 until weekRows * 7).map { index ->
             val dayMs = gridStart + index * DAY_MS
             val dc = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = dayMs }
             val inMonth = dayMs in monthStart..monthEnd
@@ -491,7 +494,7 @@ object AutoWallpaperGenerator {
             context,
             "calendar wallpaper data month=${fmt(monthStart)} rows=$rows metadata=${metadata.size} matched=$matchedRows unmatched=$unmatchedRows daysWithBooks=${cells.count { it.inMonth && it.books.isNotEmpty() }}"
         )
-        return CalendarBuildData(monthStart, monthEnd, cells, rows, matchedRows, unmatchedRows)
+        return CalendarBuildData(monthStart, monthEnd, weekRows, cells, rows, matchedRows, unmatchedRows)
     }
 
     private fun loadCalendarMetadata(context: Context, s: AutoSettings): List<MetadataBook> {
@@ -1206,24 +1209,24 @@ object AutoWallpaperGenerator {
         val bodyFace = resolveTypeface(context, s.bodyFont, false)
         val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = muted
-            textSize = (w * 0.095f).coerceIn(72f, 152f)
+            textSize = (w * 0.072f).coerceIn(58f, 116f)
             typeface = Typeface.create(titleFace, Typeface.BOLD)
         }
-        val arrow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val summaryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = muted
-            textSize = (w * 0.09f).coerceIn(68f, 138f)
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
+            textSize = (w * 0.024f).coerceIn(22f, 38f)
+            typeface = Typeface.create(bodyFace, Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
         }
         val weekPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = muted
-            textSize = (w * 0.034f).coerceIn(28f, 56f)
+            textSize = (w * 0.03f).coerceIn(26f, 48f)
             typeface = Typeface.create(bodyFace, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
         val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = ink
-            textSize = (w * 0.04f).coerceIn(34f, 62f)
+            textSize = (w * 0.036f).coerceIn(32f, 56f)
             typeface = Typeface.create(bodyFace, Typeface.NORMAL)
         }
         val smallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1246,21 +1249,25 @@ object AutoWallpaperGenerator {
         }
 
         val marginX = w * 0.055f
-        val top = h * 0.045f
+        val top = h * 0.034f
         val monthText = SimpleDateFormat("M/yyyy", Locale.US).format(Date(data.monthStartMs))
         canvas.drawText(monthText, marginX, top + title.textSize, title)
-        canvas.drawText("‹", w - marginX - w * 0.22f, top + title.textSize * 0.98f, arrow)
-        canvas.drawText("›", w - marginX - w * 0.08f, top + title.textSize * 0.98f, arrow)
+        val coveredDays = data.cells.count { it.inMonth && it.books.isNotEmpty() }
+        val totalDuration = data.cells.filter { it.inMonth }.sumOf { it.totalMs }
+        canvas.drawText("${coveredDays}天有封面", w - marginX, top + title.textSize * 0.62f, summaryPaint)
+        summaryPaint.typeface = Typeface.create(bodyFace, Typeface.NORMAL)
+        canvas.drawText("${data.matchedRows}次记录 · ${compactDuration(totalDuration)}", w - marginX, top + title.textSize * 1.05f, summaryPaint)
 
-        val gridTop = top + title.textSize + h * 0.06f
+        val gridTop = top + title.textSize + h * 0.035f
         val gridLeft = marginX
         val gridRight = w - marginX
         val gridWidth = gridRight - gridLeft
-        val weekH = h * 0.072f
+        val weekH = h * 0.058f
         val gridBottom = h - h * 0.055f
-        val rowH = ((gridBottom - gridTop - weekH) / 6f).coerceAtLeast(100f)
+        val rowCount = data.weekRows
+        val rowH = ((gridBottom - gridTop - weekH) / rowCount.toFloat()).coerceAtLeast(100f)
         val colW = gridWidth / 7f
-        val gridRect = RectF(gridLeft, gridTop, gridRight, gridTop + weekH + rowH * 6f)
+        val gridRect = RectF(gridLeft, gridTop, gridRight, gridTop + weekH + rowH * rowCount)
         canvas.drawRoundRect(gridRect, w * 0.018f, w * 0.018f, fill)
         canvas.drawRoundRect(gridRect, w * 0.018f, w * 0.018f, gridStroke)
 
@@ -1271,7 +1278,7 @@ object AutoWallpaperGenerator {
         }
         canvas.drawLine(gridLeft, gridTop + weekH, gridRight, gridTop + weekH, line)
 
-        for (r in 0 until 6) {
+        for (r in 0 until rowCount) {
             val y0 = gridTop + weekH + rowH * r
             if (r > 0) canvas.drawLine(gridLeft, y0, gridRight, y0, line)
             for (col in 0 until 7) {
@@ -1284,10 +1291,10 @@ object AutoWallpaperGenerator {
 
                 if (cell.inMonth && cell.books.isNotEmpty()) {
                     val coverArea = RectF(
-                        x0 + colW * 0.08f,
-                        y0 + rowH * 0.28f,
-                        x0 + colW * 0.92f,
-                        y0 + rowH * 0.82f
+                        x0 + colW * 0.05f,
+                        y0 + rowH * 0.22f,
+                        x0 + colW * 0.95f,
+                        y0 + rowH * 0.9f
                     )
                     drawCalendarBookStack(canvas, coverArea, cell.books, bodyFace)
                     if (cell.totalMs > 0L) {
@@ -1303,7 +1310,6 @@ object AutoWallpaperGenerator {
             }
         }
 
-        val coveredDays = data.cells.count { it.inMonth && it.books.isNotEmpty() }
         val note = "Neo 本地月历 · ${coveredDays}天有封面 · 近似匹配"
         smallPaint.color = muted
         smallPaint.textAlign = Paint.Align.LEFT
@@ -1314,22 +1320,25 @@ object AutoWallpaperGenerator {
 
     private fun drawCalendarBookStack(canvas: Canvas, area: RectF, books: List<CalendarCoverItem>, bodyFace: Typeface) {
         val count = books.size.coerceIn(1, 4)
-        val gap = area.width() * 0.045f
+        val gap = area.width() * 0.025f
+        val maxCoverH = area.height()
+        val singleW = (maxCoverH * 0.66f).coerceAtMost(area.width() * 0.86f)
         val coverW = when (count) {
-            1 -> area.width() * 0.68f
-            2 -> area.width() * 0.5f
-            else -> area.width() * 0.42f
+            1 -> singleW
+            2 -> (area.width() * 0.57f).coerceAtMost(maxCoverH * 0.66f)
+            else -> (area.width() * 0.47f).coerceAtMost(maxCoverH * 0.66f)
         }
-        val coverH = area.height()
+        val coverH = (coverW / 0.66f).coerceAtMost(maxCoverH)
         val startX = when (count) {
             1 -> area.left + (area.width() - coverW) / 2f
-            2 -> area.left + area.width() * 0.13f
-            else -> area.left + area.width() * 0.04f
+            2 -> area.left + area.width() * 0.07f
+            else -> area.left + area.width() * 0.02f
         }
         books.take(count).forEachIndexed { i, book ->
-            val offset = i * (coverW * 0.34f + gap)
-            val topOffset = if (i % 2 == 0) 0f else area.height() * 0.08f
-            val rect = RectF(startX + offset, area.top + topOffset, startX + offset + coverW, area.top + topOffset + coverH * 0.9f)
+            val offset = i * (coverW * 0.3f + gap)
+            val topOffset = if (i % 2 == 0) 0f else area.height() * 0.045f
+            val left = (startX + offset).coerceAtMost(area.right - coverW)
+            val rect = RectF(left, area.top + topOffset, left + coverW, area.top + topOffset + coverH)
             if (book.bitmap != null) {
                 drawFittedBitmap(canvas, book.bitmap, rect)
             } else {
