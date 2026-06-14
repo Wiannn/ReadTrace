@@ -1254,9 +1254,15 @@ object AutoWallpaperGenerator {
         canvas.drawText(monthText, marginX, top + title.textSize, title)
         val coveredDays = data.cells.count { it.inMonth && it.books.isNotEmpty() }
         val totalDuration = data.cells.filter { it.inMonth }.sumOf { it.totalMs }
-        canvas.drawText("${coveredDays}天有封面", w - marginX, top + title.textSize * 0.62f, summaryPaint)
+        val peakCell = data.cells.filter { it.inMonth }.maxByOrNull { it.totalMs }
+        canvas.drawText("本月 ${compactDuration(totalDuration)}", w - marginX, top + title.textSize * 0.62f, summaryPaint)
         summaryPaint.typeface = Typeface.create(bodyFace, Typeface.NORMAL)
-        canvas.drawText("${data.matchedRows}次记录 · ${compactDuration(totalDuration)}", w - marginX, top + title.textSize * 1.05f, summaryPaint)
+        val peakText = if (peakCell != null && peakCell.totalMs > 0L) {
+            "峰值 ${peakCell.dayOfMonth}日 ${compactDuration(peakCell.totalMs)}"
+        } else {
+            "峰值 -"
+        }
+        canvas.drawText("$peakText · ${data.matchedRows}次", w - marginX, top + title.textSize * 1.05f, summaryPaint)
 
         val gridTop = top + title.textSize + h * 0.035f
         val gridLeft = marginX
@@ -1292,15 +1298,19 @@ object AutoWallpaperGenerator {
                 if (cell.inMonth && cell.books.isNotEmpty()) {
                     val coverArea = RectF(
                         x0 + colW * 0.05f,
-                        y0 + rowH * 0.22f,
+                        y0 + rowH * 0.31f,
                         x0 + colW * 0.95f,
-                        y0 + rowH * 0.9f
+                        y0 + rowH * 0.91f
                     )
                     drawCalendarBookStack(canvas, coverArea, cell.books, bodyFace)
                     if (cell.totalMs > 0L) {
-                        smallPaint.color = muted
-                        smallPaint.textAlign = Paint.Align.RIGHT
-                        canvas.drawText(compactDuration(cell.totalMs), x0 + colW * 0.92f, y0 + rowH * 0.94f, smallPaint)
+                        drawCalendarDurationBadge(
+                            canvas,
+                            compactDuration(cell.totalMs),
+                            x0 + colW * 0.92f,
+                            y0 + rowH * 0.9f,
+                            bodyFace
+                        )
                     }
                 } else if (cell.inMonth && cell.eventCount > 0) {
                     smallPaint.color = muted
@@ -1310,7 +1320,7 @@ object AutoWallpaperGenerator {
             }
         }
 
-        val note = "Neo 本地月历 · ${coveredDays}天有封面 · 近似匹配"
+        val note = "Neo 本地月历 · ${coveredDays}天有记录封面 · 近似匹配"
         smallPaint.color = muted
         smallPaint.textAlign = Paint.Align.LEFT
         canvas.drawText(note, marginX, h - h * 0.024f, smallPaint)
@@ -1351,6 +1361,31 @@ object AutoWallpaperGenerator {
             }
             canvas.drawRect(rect, border)
         }
+    }
+
+    private fun drawCalendarDurationBadge(canvas: Canvas, label: String, right: Float, bottom: Float, bodyFace: Typeface) {
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 28f
+            typeface = Typeface.create(bodyFace, Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
+        }
+        val padX = 10f
+        val padY = 5f
+        val textW = text.measureText(label)
+        val rect = RectF(
+            right - textW - padX * 2f,
+            bottom - text.textSize - padY * 2.2f,
+            right,
+            bottom
+        )
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(225, 35, 22, 20)
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(rect, 6f, 6f, fill)
+        val baseline = rect.centerY() - (text.descent() + text.ascent()) / 2f
+        canvas.drawText(label, rect.right - padX, baseline, text)
     }
 
     private fun drawFittedBitmap(canvas: Canvas, bitmap: Bitmap, dst: RectF) {
