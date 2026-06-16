@@ -71,6 +71,12 @@ object AutoWallpaperGenerator {
         val matchedRows: Int,
         val unmatchedRows: Int
     )
+    private data class CalendarMonthFrame(
+        val monthStart: Long,
+        val monthEnd: Long,
+        val weekRows: Int,
+        val gridStart: Long
+    )
     private data class ChartStats(val totalMs: Long, val points: LongArray, val labels: List<String>)
     private data class WeReadBuildData(
         val rangeStart: Long,
@@ -185,6 +191,46 @@ object AutoWallpaperGenerator {
 
     fun buildPreviewFromPrefs(context: Context, sourceMark: String = "M"): PreviewResult? {
         return runCatching { buildPreviewInternal(context, sourceMark, false) }.getOrNull()
+    }
+
+    fun bootstrapReadingStoreIfNeeded(context: Context): Boolean {
+        return runCatching {
+            val bootstrapSettings = readSettings(context).copy(
+                sourceMode = "DURATION",
+                periodMode = "THIS_MONTH"
+            )
+            val now = System.currentTimeMillis()
+            val monthBases = linkedSetOf(now)
+            val recentStart = Calendar.getInstance(TimeZone.getDefault()).apply {
+                timeInMillis = now
+                add(Calendar.DAY_OF_MONTH, -29)
+            }.timeInMillis
+            if (!isSameMonth(now, recentStart)) {
+                monthBases.add(recentStart)
+            }
+
+            var months = 0
+            monthBases.forEach { baseMs ->
+                val frame = calendarMonthFrame(baseMs)
+                val data = buildLiveNeoCalendarData(
+                    context = context,
+                    s = bootstrapSettings,
+                    monthStart = frame.monthStart,
+                    monthEnd = frame.monthEnd,
+                    weekRows = frame.weekRows,
+                    gridStart = frame.gridStart
+                )
+                if (data != null) months += 1
+            }
+            AutoRefreshLog.i(
+                context,
+                "ReadingDataStore bootstrap done months=$months totalDb=${ReadingDataStore.countDailyBooks(context)}"
+            )
+            true
+        }.getOrElse {
+            AutoRefreshLog.e(context, "ReadingDataStore bootstrap failed", it)
+            false
+        }
     }
 
     fun buildWeReadStatsPreviewFromPrefs(context: Context, sourceMark: String = "W"): PreviewResult? {
@@ -400,6 +446,26 @@ object AutoWallpaperGenerator {
     private fun buildLocalCalendarData(context: Context, s: AutoSettings): CalendarBuildData? {
         val baseRange = resolvePeriodRange(s)
         val baseMs = baseRange?.second ?: System.currentTimeMillis()
+        val frame = calendarMonthFrame(baseMs)
+        val monthStart = frame.monthStart
+        val monthEnd = frame.monthEnd
+        val weekRows = frame.weekRows
+        val gridStart = frame.gridStart
+
+        val liveData = buildLiveNeoCalendarData(context, s, monthStart, monthEnd, weekRows, gridStart)
+        val storedData = buildStoredNeoCalendarData(context, s, monthStart, monthEnd, weekRows, gridStart)
+        if (storedData != null) {
+            AutoRefreshLog.i(
+                context,
+                "calendar wallpaper use data store month=${fmt(monthStart)} rows=${storedData.statsRows} daysWithBooks=${storedData.cells.count { it.inMonth && it.books.isNotEmpty() }}"
+            )
+            return storedData
+        }
+        AutoRefreshLog.i(context, "calendar wallpaper data store empty, fallback live month=${fmt(monthStart)}")
+        return liveData
+    }
+
+    private fun calendarMonthFrame(baseMs: Long): CalendarMonthFrame {
         val cal = Calendar.getInstance(TimeZone.getDefault())
         cal.timeInMillis = baseMs
         cal.set(Calendar.DAY_OF_MONTH, 1)
@@ -419,18 +485,14 @@ object AutoWallpaperGenerator {
         val weekRows = ((mondayIndex + daysInMonth + 6) / 7).coerceIn(5, 6)
         gridCal.add(Calendar.DAY_OF_MONTH, -mondayIndex)
         val gridStart = startOfDayMs(gridCal.timeInMillis)
+        return CalendarMonthFrame(monthStart, monthEnd, weekRows, gridStart)
+    }
 
-        val liveData = buildLiveNeoCalendarData(context, s, monthStart, monthEnd, weekRows, gridStart)
-        val storedData = buildStoredNeoCalendarData(context, s, monthStart, monthEnd, weekRows, gridStart)
-        if (storedData != null) {
-            AutoRefreshLog.i(
-                context,
-                "calendar wallpaper use data store month=${fmt(monthStart)} rows=${storedData.statsRows} daysWithBooks=${storedData.cells.count { it.inMonth && it.books.isNotEmpty() }}"
-            )
-            return storedData
-        }
-        AutoRefreshLog.i(context, "calendar wallpaper data store empty, fallback live month=${fmt(monthStart)}")
-        return liveData
+    private fun isSameMonth(aMs: Long, bMs: Long): Boolean {
+        val a = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = aMs }
+        val b = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = bMs }
+        return a.get(Calendar.YEAR) == b.get(Calendar.YEAR) &&
+            a.get(Calendar.MONTH) == b.get(Calendar.MONTH)
     }
 
     private fun buildLiveNeoCalendarData(
@@ -943,6 +1005,7 @@ object AutoWallpaperGenerator {
             "YESTERDAY" -> "昨天"
             "THIS_WEEK" -> "本周"
             "LAST_WEEK" -> "上周"
+            "THIS_MONTH" -> "本月"
             "LAST_7_DAYS" -> "最近7天"
             "LAST_30_DAYS" -> "最近30天"
             "CUSTOM" -> "自定义周期"
@@ -1820,7 +1883,7 @@ object AutoWallpaperGenerator {
         return when (s.periodMode) {
             "TODAY", "YESTERDAY" -> BucketMode.HOUR
             "THIS_WEEK", "LAST_WEEK", "LAST_7_DAYS" -> BucketMode.DAY
-            "LAST_30_DAYS" -> BucketMode.DAY
+            "THIS_MONTH", "LAST_30_DAYS" -> BucketMode.DAY
             "CUSTOM" -> when {
                 days <= 14 -> BucketMode.DAY
                 days <= 90 -> BucketMode.WEEK
@@ -2080,6 +2143,14 @@ object AutoWallpaperGenerator {
                 cal.add(Calendar.DAY_OF_MONTH, -6)
                 cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
                 cal.timeInMillis to end
+            }
+            "THIS_MONTH" -> {
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                val start = cal.timeInMillis
+                cal.add(Calendar.MONTH, 1)
+                cal.add(Calendar.MILLISECOND, -1)
+                start to cal.timeInMillis
             }
             "LAST_30_DAYS" -> {
                 cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59); cal.set(Calendar.MILLISECOND, 999)

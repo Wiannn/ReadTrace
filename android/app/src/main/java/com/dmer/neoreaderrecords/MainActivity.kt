@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
     )
 
     enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS, WEREAD, MIXED }
-    enum class PeriodMode { TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
+    enum class PeriodMode { TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, THIS_MONTH, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
     enum class ReadingFilterMode { ALL, READING_ONLY, FINISHED_ONLY }
     enum class ChartStyleMode { LINE, BAR }
     enum class YAxisMode { AUTO, FIXED }
@@ -426,6 +426,27 @@ class MainActivity : ComponentActivity() {
         applySettingsPreview()
         checkForUpdatesIfNeeded(force = false)
         writeDebugLog("setupUi_done")
+        startReadingStoreBootstrapIfNeeded()
+    }
+
+    private fun startReadingStoreBootstrapIfNeeded() {
+        val prefs = getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        val key = "reading_store_bootstrap_neo_month_v1_done"
+        if (prefs.getBoolean(key, false)) {
+            appendUiDebug("readingStoreBootstrap skip alreadyDone")
+            return
+        }
+        Thread {
+            val ok = AutoWallpaperGenerator.bootstrapReadingStoreIfNeeded(applicationContext)
+            if (ok) {
+                prefs.edit().putBoolean(key, true).apply()
+            }
+            appendUiDebug("readingStoreBootstrap finished ok=$ok")
+        }.apply {
+            name = "reading-store-bootstrap"
+            isDaemon = true
+            start()
+        }
     }
 
     private fun appendUiDebug(message: String) {
@@ -926,8 +947,8 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 0, 0, 40)
         })
 
-        val periodOptions = listOf(4000 to "当天\n只看今天", 4006 to "昨天\n只看昨日", 4001 to "本周\n周视图", 4002 to "上周\n回看上周", 4003 to "最近7天\n滚动7天", 4004 to "最近30天\n月度概览", 4005 to "自定义起止\n手动选日期")
-        val periodNames = listOf(PeriodMode.TODAY.name, PeriodMode.YESTERDAY.name, PeriodMode.THIS_WEEK.name, PeriodMode.LAST_WEEK.name, PeriodMode.LAST_7_DAYS.name, PeriodMode.LAST_30_DAYS.name, PeriodMode.CUSTOM.name)
+        val periodOptions = listOf(4000 to "当天\n只看今天", 4006 to "昨天\n只看昨日", 4001 to "本周\n周视图", 4002 to "上周\n回看上周", 4007 to "本月\n自然月历", 4003 to "最近7天\n滚动7天", 4004 to "最近30天\n月度概览", 4005 to "自定义起止\n手动选日期")
+        val periodNames = listOf(PeriodMode.TODAY.name, PeriodMode.YESTERDAY.name, PeriodMode.THIS_WEEK.name, PeriodMode.LAST_WEEK.name, PeriodMode.THIS_MONTH.name, PeriodMode.LAST_7_DAYS.name, PeriodMode.LAST_30_DAYS.name, PeriodMode.CUSTOM.name)
         val savedPeriod = prefs.getString("period_mode", PeriodMode.THIS_WEEK.name) ?: PeriodMode.THIS_WEEK.name
         periodGroup = makeRadioGroup(periodOptions, selectedId(savedPeriod, 4001, periodOptions, periodNames))
 
@@ -1050,7 +1071,7 @@ class MainActivity : ComponentActivity() {
         appendUiDebug("buildSettingsPage added booxDevicePresetRow rootChildCount=${root.childCount} rowChildren=${booxDevicePresetRow.childCount}")
         addHint("说明：首次会根据本机型号自动匹配；匹配不到时默认 Leaf5。这个选项会影响预览和生成壁纸的图片分辨率。")
         val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
-        addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。")
+        addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。月历封面墙复用这个周期：选择“本月”时显示当前自然月；选择“最近30天”或其它周期时，会显示该周期结束日期所在月份的月历。")
         val sourceSegment = bindSegmented("数据来源", sourceGroup, sourceOptions, isVertical = true)
         addHint("说明：Neo 阅读器读取文石本地数据库，适合离线使用；微信读书需要联网读取 API；混合来源会把本地和微信的统计时长相加，书单按阅读时长合并排序，封面按最近阅读来源选择，失败时回退另一来源。混合来源包含联网数据，因此自动模式下不会在熄屏瞬间请求网络，而是在解锁后刷新，通常下一次锁屏看到新图；如果微信读书读取失败，会继续使用本地数据。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
@@ -1683,6 +1704,7 @@ class MainActivity : ComponentActivity() {
             PeriodMode.YESTERDAY -> "昨天"
             PeriodMode.THIS_WEEK -> "本周"
             PeriodMode.LAST_WEEK -> "上周"
+            PeriodMode.THIS_MONTH -> "本月"
             PeriodMode.LAST_7_DAYS -> "最近7天"
             PeriodMode.LAST_30_DAYS -> "最近30天"
             PeriodMode.CUSTOM -> "自定义周期"
@@ -2181,6 +2203,7 @@ class MainActivity : ComponentActivity() {
             4000 -> PeriodMode.TODAY
             4006 -> PeriodMode.YESTERDAY
             4002 -> PeriodMode.LAST_WEEK
+            4007 -> PeriodMode.THIS_MONTH
             4003 -> PeriodMode.LAST_7_DAYS
             4004 -> PeriodMode.LAST_30_DAYS
             4005 -> PeriodMode.CUSTOM
