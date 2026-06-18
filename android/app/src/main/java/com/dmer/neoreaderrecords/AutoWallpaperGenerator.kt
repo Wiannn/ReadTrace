@@ -35,6 +35,7 @@ object AutoWallpaperGenerator {
     private const val READING_STORE_SYNC_LOOKBACK_DAYS = 3
     private const val KEY_READING_STORE_LAST_SYNC_ATTEMPT_MS = "reading_store_last_sync_attempt_ms"
     private const val KEY_READING_STORE_LAST_SYNC_SUCCESS_MS = "reading_store_last_sync_success_ms"
+    private const val KEY_WEREAD_DAILY_TRACKING_START_DATE = "weread_daily_tracking_start_date"
     private val readingStoreSyncLock = Any()
 
     private data class BookItem(
@@ -718,38 +719,71 @@ object AutoWallpaperGenerator {
         }
         val totalsByDate = totals.associateBy { it.date }
         val periodBooks = ReadingDataStore.queryPeriodBooks(context, "WEREAD", startDate, endDate)
+        val dailyBooks = ReadingDataStore.queryDailyBooks(context, "WEREAD", startDate, endDate)
+        val dailyBooksByDate = dailyBooks.groupBy { it.date }
+        val trackingStartDate = weReadDailyTrackingStartDate(context)
         val booksByPeriod = periodBooks.groupBy { it.periodStart to it.periodEnd }
         val cells = (0 until weekRows * 7).map { index ->
             val dayMs = gridStart + index * DAY_MS
             val dayDate = dateFmt.format(Date(dayMs))
             val dayTotal = totalsByDate[dayDate]
             val inMonth = dayMs in monthStart..monthEnd
-            val candidates = if (dayTotal == null) {
-                emptyList()
-            } else {
-                booksByPeriod.entries
+            val exactRecords = dailyBooksByDate[dayDate].orEmpty()
+            val periodCandidates = booksByPeriod.entries
                     .filter { (period, _) -> dayDate in period.first..period.second }
                     .flatMap { it.value }
                     .groupBy { it.bookKey }
                     .map { (_, records) ->
                         records.maxByOrNull { it.durationMs }!!
                     }
+            val candidates = when {
+                dayTotal == null -> emptyList()
+                exactRecords.isNotEmpty() -> exactRecords.map { record ->
+                    val monthlyDuration = periodCandidates
+                        .firstOrNull { it.bookKey == record.bookKey }
+                        ?.durationMs
+                        ?: record.durationMs
+                    ReadingDataStore.PeriodBookRecord(
+                        periodStart = dayDate,
+                        periodEnd = dayDate,
+                        source = record.source,
+                        bookKey = record.bookKey,
+                        title = record.title,
+                        author = record.author,
+                        coverCachePath = record.coverCachePath,
+                        durationMs = monthlyDuration,
+                        confidence = record.confidence,
+                        lastSeenAt = record.lastSeenAt
+                    )
+                }
+                dayDate < trackingStartDate -> periodCandidates.filter { record ->
+                    record.lastSeenAt <= 0L ||
+                        dateFmt.format(Date(record.lastSeenAt)) == dayDate
+                }
+                else -> emptyList()
             }
             val selected = when (s.calendarStackOrder) {
                 "SHORTEST_TOP" -> candidates.sortedBy { it.durationMs }
                 "LATEST_TOP" -> candidates.sortedByDescending { it.lastSeenAt }
                 else -> candidates.sortedByDescending { it.durationMs }
             }.take(4)
-            val candidateTotal = selected.sumOf { it.durationMs }.coerceAtLeast(1L)
+            val candidateTotal = selected.sumOf { it.durationMs }
             val books = orderCalendarStack(
                 selected.map { record ->
+                    val allocatedDuration = when {
+                        (dayTotal?.durationMs ?: 0L) <= 0L -> 0L
+                        candidateTotal > 0L ->
+                            (dayTotal!!.durationMs * record.durationMs / candidateTotal).coerceAtLeast(1L)
+                        selected.isNotEmpty() ->
+                            (dayTotal!!.durationMs / selected.size).coerceAtLeast(1L)
+                        else -> 0L
+                    }
                     CalendarCoverItem(
                         title = record.title,
                         author = record.author,
                         path = record.bookKey,
                         status = 1,
-                        durationMs = ((dayTotal?.durationMs ?: 0L) * record.durationMs / candidateTotal)
-                            .coerceAtLeast(if ((dayTotal?.durationMs ?: 0L) > 0L) 1L else 0L),
+                        durationMs = allocatedDuration,
                         lastSeenAt = record.lastSeenAt,
                         bitmap = record.coverCachePath
                             ?.takeIf { it.isNotBlank() }
@@ -772,7 +806,7 @@ object AutoWallpaperGenerator {
         }
         AutoRefreshLog.i(
             context,
-            "WeRead calendar data source=db range=$startDate~$endDate totals=${totals.size} candidates=${periodBooks.size} daysWithBooks=${cells.count { it.inMonth && it.books.isNotEmpty() }}"
+            "WeRead calendar data source=db range=$startDate~$endDate trackingStart=$trackingStartDate totals=${totals.size} dailyBooks=${dailyBooks.size} candidates=${periodBooks.size} daysWithBooks=${cells.count { it.inMonth && it.books.isNotEmpty() }}"
         )
         return CalendarBuildData(
             monthStartMs = monthStart,
@@ -1292,6 +1326,7 @@ object AutoWallpaperGenerator {
         monthStart.add(Calendar.DAY_OF_MONTH, -1)
         val periodEnd = dateFmt.format(Date(monthStart.timeInMillis))
         val now = System.currentTimeMillis()
+        val trackingStartDate = ensureWeReadDailyTrackingStartDate(context, dateFmt.format(Date(now)))
 
         val totals = stats.buckets.mapNotNull { (bucketSeconds, durationSeconds) ->
             val dayMs = startOfDayMs(bucketSeconds * 1000L)
@@ -1345,10 +1380,50 @@ object AutoWallpaperGenerator {
             records = periodBooks,
             reason = "weread_monthly_ranking"
         )
+        val dailyBookRecords = stats.books.mapNotNull { book ->
+            val cachedCover = cachedCovers[book.bookId] ?: return@mapNotNull null
+            if (cachedCover.readUpdateTimeMs <= 0L) return@mapNotNull null
+            val date = dateFmt.format(Date(cachedCover.readUpdateTimeMs))
+            if (date !in periodStart..periodEnd) return@mapNotNull null
+            ReadingDataStore.DailyBookRecord(
+                date = date,
+                source = "WEREAD",
+                bookKey = book.bookId.ifBlank { "${book.title.trim()}|${book.author.trim()}" },
+                title = book.title,
+                author = book.author,
+                coverCachePath = cachedCover.cachePath.takeIf { it.isNotBlank() },
+                durationMs = 0L,
+                progress = null,
+                status = 1,
+                confidence = "EXACT_LAST_READ",
+                lastSeenAt = cachedCover.readUpdateTimeMs
+            )
+        }
+        val dailyBooksWritten = ReadingDataStore.upsertDailyBooks(
+            context,
+            dailyBookRecords,
+            "weread_last_read_tracking"
+        )
         AutoRefreshLog.i(
             context,
-            "WeRead data store persisted period=$periodStart~$periodEnd daily=${totals.size}/$totalsWritten candidates=${periodBooks.size}/$booksWritten totalDaily=${ReadingDataStore.countDailyTotals(context, "WEREAD")} totalCandidates=${ReadingDataStore.countPeriodBooks(context, "WEREAD")}"
+            "WeRead data store persisted period=$periodStart~$periodEnd trackingStart=$trackingStartDate daily=${totals.size}/$totalsWritten dailyBooks=${dailyBookRecords.size}/$dailyBooksWritten candidates=${periodBooks.size}/$booksWritten totalDaily=${ReadingDataStore.countDailyTotals(context, "WEREAD")} totalCandidates=${ReadingDataStore.countPeriodBooks(context, "WEREAD")}"
         )
+    }
+
+    private fun ensureWeReadDailyTrackingStartDate(context: Context, today: String): String {
+        val prefs = context.getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        val existing = prefs.getString(KEY_WEREAD_DAILY_TRACKING_START_DATE, "").orEmpty()
+        if (existing.isNotBlank()) return existing
+        prefs.edit().putString(KEY_WEREAD_DAILY_TRACKING_START_DATE, today).apply()
+        AutoRefreshLog.i(context, "WeRead daily tracking initialized start=$today")
+        return today
+    }
+
+    private fun weReadDailyTrackingStartDate(context: Context): String {
+        return context.getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_WEREAD_DAILY_TRACKING_START_DATE, "9999-12-31")
+            .orEmpty()
+            .ifBlank { "9999-12-31" }
     }
 
     private fun queryTopBooksByDuration(

@@ -366,16 +366,14 @@ object WeReadClient {
                         break
                     }
                 }
-                if (file.exists() && file.length() > 0L) {
-                    cached[bookId] = CachedBookCover(
-                        cachePath = file.absolutePath,
-                        readUpdateTimeMs = normalizeEpochMs(book.optLong("readUpdateTime", 0L))
-                    )
-                }
+                cached[bookId] = CachedBookCover(
+                    cachePath = file.takeIf { it.exists() && it.length() > 0L }?.absolutePath.orEmpty(),
+                    readUpdateTimeMs = normalizeEpochMs(book.optLong("readUpdateTime", 0L))
+                )
             }
             AutoRefreshLog.i(
                 context,
-                "WeRead calendar covers requested=${ids.size} cached=${cached.size}"
+                "WeRead calendar covers requested=${ids.size} matched=${cached.size} files=${cached.values.count { it.cachePath.isNotBlank() }}"
             )
             cached
         }.getOrElse {
