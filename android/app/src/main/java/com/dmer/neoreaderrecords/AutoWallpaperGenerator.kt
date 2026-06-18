@@ -757,7 +757,7 @@ object AutoWallpaperGenerator {
                     )
                 }
                 dayDate < trackingStartDate -> periodCandidates.filter { record ->
-                    record.lastSeenAt > 0L &&
+                    record.lastSeenAt <= 0L ||
                         dateFmt.format(Date(record.lastSeenAt)) == dayDate
                 }
                 else -> emptyList()
@@ -816,7 +816,7 @@ object AutoWallpaperGenerator {
             statsRows = totals.size,
             matchedRows = cells.count { it.inMonth && it.books.isNotEmpty() },
             unmatchedRows = cells.count { it.inMonth && it.totalMs > 0L && it.books.isEmpty() },
-            footerLabel = "微信读书月历 · W=微信 · 仅显示有日期依据的书籍"
+            footerLabel = "微信读书月历 · W=微信 · 书籍按月度占比分配"
         )
     }
 
