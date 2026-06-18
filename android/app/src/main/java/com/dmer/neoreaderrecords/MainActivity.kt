@@ -432,16 +432,22 @@ class MainActivity : ComponentActivity() {
     private fun startReadingStoreBootstrapIfNeeded() {
         val prefs = getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
         val key = "reading_store_bootstrap_neo_month_v1_done"
-        if (prefs.getBoolean(key, false)) {
-            appendUiDebug("readingStoreBootstrap skip alreadyDone")
-            return
-        }
         Thread {
-            val ok = AutoWallpaperGenerator.bootstrapReadingStoreIfNeeded(applicationContext)
-            if (ok) {
-                prefs.edit().putBoolean(key, true).apply()
+            val bootstrapDone = prefs.getBoolean(key, false)
+            val bootstrapOk = if (bootstrapDone) {
+                appendUiDebug("readingStoreBootstrap skip alreadyDone")
+                true
+            } else {
+                AutoWallpaperGenerator.bootstrapReadingStoreIfNeeded(applicationContext).also { ok ->
+                    if (ok) prefs.edit().putBoolean(key, true).apply()
+                }
             }
-            appendUiDebug("readingStoreBootstrap finished ok=$ok")
+            val wallpaperMode = prefs.getString("wallpaper_mode", "STATS") ?: "STATS"
+            val incrementalOk = wallpaperMode == "CALENDAR" ||
+                AutoWallpaperGenerator.syncRecentNeoReadingStore(applicationContext, "app_start")
+            appendUiDebug(
+                "readingStoreMaintenance finished bootstrapOk=$bootstrapOk incrementalOk=$incrementalOk wallpaperMode=$wallpaperMode"
+            )
         }.apply {
             name = "reading-store-bootstrap"
             isDaemon = true

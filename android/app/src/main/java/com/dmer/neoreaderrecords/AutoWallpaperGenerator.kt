@@ -31,6 +31,11 @@ object AutoWallpaperGenerator {
     private val metadataUri = Uri.parse("content://com.onyx.content.database.ContentProvider/Metadata")
     private val statsUri = Uri.parse("content://com.onyx.kreader.statistics.provider/OnyxStatisticsModel")
     private const val DAY_MS = 86_400_000L
+    private const val READING_STORE_SYNC_MIN_INTERVAL_MS = 60_000L
+    private const val READING_STORE_SYNC_LOOKBACK_DAYS = 3
+    private const val KEY_READING_STORE_LAST_SYNC_ATTEMPT_MS = "reading_store_last_sync_attempt_ms"
+    private const val KEY_READING_STORE_LAST_SYNC_SUCCESS_MS = "reading_store_last_sync_success_ms"
+    private val readingStoreSyncLock = Any()
 
     private data class BookItem(
         val title: String,
@@ -230,6 +235,64 @@ object AutoWallpaperGenerator {
         }.getOrElse {
             AutoRefreshLog.e(context, "ReadingDataStore bootstrap failed", it)
             false
+        }
+    }
+
+    fun syncRecentNeoReadingStore(context: Context, reason: String): Boolean {
+        return synchronized(readingStoreSyncLock) {
+            val prefs = context.getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+            val now = System.currentTimeMillis()
+            val lastAttempt = prefs.getLong(KEY_READING_STORE_LAST_SYNC_ATTEMPT_MS, 0L)
+            val delta = now - lastAttempt
+            if (delta in 0 until READING_STORE_SYNC_MIN_INTERVAL_MS) {
+                AutoRefreshLog.i(
+                    context,
+                    "ReadingDataStore incremental skip reason=$reason delta=${delta}ms"
+                )
+                return@synchronized true
+            }
+            prefs.edit().putLong(KEY_READING_STORE_LAST_SYNC_ATTEMPT_MS, now).apply()
+
+            runCatching {
+                val end = Calendar.getInstance(TimeZone.getDefault()).apply {
+                    timeInMillis = now
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+                val start = Calendar.getInstance(TimeZone.getDefault()).apply {
+                    timeInMillis = now
+                    add(Calendar.DAY_OF_MONTH, -(READING_STORE_SYNC_LOOKBACK_DAYS - 1))
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val settings = readSettings(context).copy(
+                    sourceMode = "DURATION",
+                    periodMode = "CUSTOM",
+                    weekStart = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(start)),
+                    weekEnd = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(end))
+                )
+                val data = buildLiveNeoCalendarData(
+                    context = context,
+                    s = settings,
+                    monthStart = start,
+                    monthEnd = end,
+                    weekRows = 1,
+                    gridStart = start
+                )
+                prefs.edit().putLong(KEY_READING_STORE_LAST_SYNC_SUCCESS_MS, now).apply()
+                AutoRefreshLog.i(
+                    context,
+                    "ReadingDataStore incremental done reason=$reason range=${fmt(start)}~${fmt(end)} rows=${data?.statsRows ?: 0} totalDb=${ReadingDataStore.countDailyBooks(context)}"
+                )
+                true
+            }.getOrElse {
+                AutoRefreshLog.e(context, "ReadingDataStore incremental failed reason=$reason", it)
+                false
+            }
         }
     }
 

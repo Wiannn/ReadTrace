@@ -22,6 +22,15 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
         val wallpaperMode = prefs.getString("wallpaper_mode", "STATS") ?: "STATS"
         val sourceMode = prefs.getString("source_mode", "DURATION") ?: "DURATION"
         AutoRefreshLog.i(applicationContext, "Worker config sourceMode=$sourceMode wallpaperMode=$wallpaperMode")
+        if (wallpaperMode != "CALENDAR") {
+            val storeSyncOk = AutoWallpaperGenerator.syncRecentNeoReadingStore(
+                applicationContext,
+                "worker_$reason"
+            )
+            AutoRefreshLog.i(applicationContext, "Worker reading store sync ok=$storeSyncOk reason=$reason")
+        } else {
+            AutoRefreshLog.i(applicationContext, "Worker reading store sync delegated to calendar generation")
+        }
         val now = System.currentTimeMillis()
         val minIntervalMs = AutoRefreshConfig.minIntervalMinutes(applicationContext) * 60_000L
         val lastMs = prefs.getLong(AutoRefreshConfig.KEY_LAST_TRIGGER_MS, 0L)
