@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var yAxisModeGroup: RadioGroup
     private lateinit var showPeakLabelCheck: CheckBox
     private lateinit var yAxisMaxInput: EditText
+    private lateinit var readingDataStoreCheck: CheckBox
     private lateinit var autoRefreshCheck: CheckBox
     private lateinit var autoModeGroup: RadioGroup
     private lateinit var autoDailyTimeInput: EditText
@@ -433,6 +434,10 @@ class MainActivity : ComponentActivity() {
 
     private fun startReadingStoreBootstrapIfNeeded() {
         val prefs = getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(this)) {
+            appendUiDebug("readingStoreMaintenance skip disabled")
+            return
+        }
         val key = "reading_store_bootstrap_neo_month_v1_done"
         Thread {
             val bootstrapDone = prefs.getBoolean(key, false)
@@ -1078,6 +1083,9 @@ class MainActivity : ComponentActivity() {
         showBookDurationCheck = makeCheck(prefs.getBoolean("show_book_duration", true))
         showChartCheck = makeCheck(prefs.getBoolean("show_chart", true))
         showPeakLabelCheck = makeCheck(prefs.getBoolean("show_peak_label", true))
+        readingDataStoreCheck = makeCheck(
+            prefs.getBoolean(AutoRefreshConfig.KEY_READING_DATA_STORE_ENABLED, false)
+        )
         autoRefreshCheck = makeCheck(prefs.getBoolean(AutoRefreshConfig.KEY_AUTO_ENABLED, true))
 
         minDurationInput = makeInput(prefs.getInt("min_duration_minutes", 1).toString())
@@ -1097,6 +1105,8 @@ class MainActivity : ComponentActivity() {
         root.addView(hiddenHost)
 
         addSectionTitle("数据与统计", "周期、数据来源、设备尺寸与时长单位")
+        bindToggle("启用阅读数据落库", readingDataStoreCheck)
+        addHint("说明：默认关闭以降低低性能墨水屏设备的历史扫描、封面缓存和数据库写入开销。开启后会在启动、解锁或定时任务中维护 Neo 与微信读书日级记录，供微信/混合月历持续积累历史；关闭不会删除已有数据，Neo 月历仍可实时读取，微信和混合月历只能手动查看已有缓存，自动任务会保留现有壁纸。")
         val booxDevicePresetRow = bindRadioChoiceRow("阅读器尺寸预设", booxDevicePresetGroup, booxDevicePresetOptions)
         appendUiDebug("buildSettingsPage added booxDevicePresetRow rootChildCount=${root.childCount} rowChildren=${booxDevicePresetRow.childCount}")
         addHint("说明：首次会根据本机型号自动匹配；匹配不到时默认 Leaf5。这个选项会影响预览和生成壁纸的图片分辨率。")
@@ -1105,7 +1115,7 @@ class MainActivity : ComponentActivity() {
         val sourceSegment = bindSegmented("数据来源", sourceGroup, sourceOptions, isVertical = true)
         addHint("说明：Neo 阅读器读取文石本地数据库，适合离线使用；微信读书需要联网读取 API；混合来源会把本地和微信的统计时长相加，书单按阅读时长合并排序，封面按最近阅读来源选择，失败时回退另一来源。混合来源包含联网数据，因此自动模式下不会在熄屏瞬间请求网络，而是在解锁后刷新，通常下一次锁屏看到新图；如果微信读书读取失败，会继续使用本地数据。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
-        val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单；月历封面墙按所选来源读取数据，Neo 使用本地阅读事件，微信读书使用精确每日总时长和快照差分确认的日级书籍。提示：Neo 封面依赖本地元数据落库，通常退出当前书籍后再锁屏更容易刷新；微信数据在解锁后生成，通常下一次锁屏显示最新结果。")
+        val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单；月历封面墙按所选来源读取数据，Neo 使用本地阅读事件，微信读书使用精确每日总时长和快照差分确认的日级书籍。提示：Neo 封面依赖 NeoReader 自身写入本地元数据，通常退出当前书籍后再锁屏更容易刷新；微信数据在解锁后生成，通常下一次锁屏显示最新结果。")
         val calendarStackOrderSegment = bindSegmented(
             "月历封面堆叠顺序",
             calendarStackOrderGroup,
@@ -1343,6 +1353,16 @@ class MainActivity : ComponentActivity() {
         yAxisModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
         footerModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
         autoRefreshCheck.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        readingDataStoreCheck.setOnCheckedChangeListener { _, enabled ->
+            if (!isInitializingUi) {
+                getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(AutoRefreshConfig.KEY_READING_DATA_STORE_ENABLED, enabled)
+                    .apply()
+                applySettingsPreview()
+                if (enabled) startReadingStoreBootstrapIfNeeded()
+            }
+        }
         autoModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
         serialModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
         wallpaperModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
@@ -2361,6 +2381,10 @@ class MainActivity : ComponentActivity() {
             .putString("note_text", settings.noteText)
             .putString("chart_style_mode", settings.chartStyleMode.name)
             .putBoolean("show_peak_label", settings.showPeakLabel)
+            .putBoolean(
+                AutoRefreshConfig.KEY_READING_DATA_STORE_ENABLED,
+                readingDataStoreCheck.isChecked
+            )
             .putString("y_axis_mode", settings.yAxisMode.name)
             .putInt("y_axis_fixed_max_minutes", settings.yAxisFixedMaxMinutes)
             .putString("title_font", settings.titleFont)
@@ -2548,6 +2572,7 @@ class MainActivity : ComponentActivity() {
                     .append(", showBookDuration=").append(s.showBookDuration.toString())
                     .append(", minDuration=").append(s.minDurationMinutes.toString())
                     .append(", topN=").append(s.topN.toString())
+                    .append(", readingDataStoreEnabled=").append(readingDataStoreCheck.isChecked.toString())
                     .append(", sourceMode=").append(s.sourceMode.name)
                     .append(", wallpaperMode=").append(s.wallpaperMode)
                     .append(", coverFitMode=").append(s.coverFitMode)

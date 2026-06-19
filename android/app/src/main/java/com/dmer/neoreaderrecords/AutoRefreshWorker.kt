@@ -22,6 +22,17 @@ class AutoRefreshWorker(context: Context, params: WorkerParameters) : Worker(con
         val wallpaperMode = prefs.getString("wallpaper_mode", "STATS") ?: "STATS"
         val sourceMode = prefs.getString("source_mode", "DURATION") ?: "DURATION"
         AutoRefreshLog.i(applicationContext, "Worker config sourceMode=$sourceMode wallpaperMode=$wallpaperMode")
+        if (
+            wallpaperMode == "CALENDAR" &&
+            (sourceMode == "WEREAD" || sourceMode == "MIXED") &&
+            !AutoRefreshConfig.isReadingDataStoreEnabled(applicationContext)
+        ) {
+            AutoRefreshLog.i(
+                applicationContext,
+                "Worker skip remote calendar: reading data store disabled source=$sourceMode"
+            )
+            return Result.success()
+        }
         if (wallpaperMode != "CALENDAR") {
             val storeSyncOk = AutoWallpaperGenerator.syncRecentNeoReadingStore(
                 applicationContext,

@@ -185,6 +185,10 @@ object ReadingDataStore {
     }
 
     fun upsertDailyBooks(context: Context, records: List<DailyBookRecord>, reason: String): Int {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "ReadingDataStore upsert skip disabled reason=$reason")
+            return 0
+        }
         if (records.isEmpty()) {
             AutoRefreshLog.i(context, "ReadingDataStore upsert skip reason=$reason records=0")
             return 0
@@ -234,6 +238,10 @@ object ReadingDataStore {
         records: List<DailyBookRecord>,
         reason: String
     ): Int {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "ReadingDataStore replace skip disabled reason=$reason")
+            return 0
+        }
         require(startDate <= endDate) { "Invalid date range: $startDate > $endDate" }
         val validRecords = records.filter {
             it.source == source && it.date >= startDate && it.date <= endDate
@@ -297,6 +305,10 @@ object ReadingDataStore {
         records: List<DailyTotalRecord>,
         reason: String
     ): Int {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "ReadingDataStore daily totals skip disabled reason=$reason")
+            return 0
+        }
         require(startDate <= endDate) { "Invalid date range: $startDate > $endDate" }
         val valid = records.filter { it.source == source && it.date in startDate..endDate }
         return runCatching {
@@ -345,6 +357,10 @@ object ReadingDataStore {
         records: List<PeriodBookRecord>,
         reason: String
     ): Int {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "ReadingDataStore period books skip disabled reason=$reason")
+            return 0
+        }
         val valid = records.filter {
             it.source == source && it.periodStart == periodStart && it.periodEnd == periodEnd
         }
@@ -495,6 +511,10 @@ object ReadingDataStore {
         trackingDate: String,
         books: List<WeReadSnapshotBook>
     ): WeReadSnapshotApplyResult? {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "ReadingDataStore WeRead snapshot skip disabled")
+            return null
+        }
         return runCatching {
             val now = System.currentTimeMillis()
             var baseline = false

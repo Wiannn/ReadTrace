@@ -211,6 +211,10 @@ object AutoWallpaperGenerator {
     }
 
     fun bootstrapReadingStoreIfNeeded(context: Context): Boolean {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "ReadingDataStore bootstrap skip disabled")
+            return true
+        }
         return runCatching {
             val bootstrapSettings = readSettings(context).copy(
                 sourceMode = "DURATION",
@@ -251,6 +255,10 @@ object AutoWallpaperGenerator {
     }
 
     fun syncRecentNeoReadingStore(context: Context, reason: String): Boolean {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "ReadingDataStore incremental skip disabled reason=$reason")
+            return true
+        }
         return synchronized(readingStoreSyncLock) {
             val prefs = context.getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
             val now = System.currentTimeMillis()
@@ -438,6 +446,8 @@ object AutoWallpaperGenerator {
         }
         val source = when {
             syncOk -> "network+db"
+            !AutoRefreshConfig.isReadingDataStoreEnabled(context) && weReadData != null ->
+                "cache_store_disabled"
             weReadData != null -> "fallback_cache"
             else -> "local_only"
         }
@@ -677,7 +687,11 @@ object AutoWallpaperGenerator {
         val bmp = drawCalendarWallpaper(context, data, s, sourceMark)
         val activeDays = data.cells.count { it.inMonth && it.totalMs > 0L }
         val coveredDays = data.cells.count { it.inMonth && it.books.isNotEmpty() }
-        val source = if (syncOk) "network+db" else "fallback_cache"
+        val source = when {
+            syncOk -> "network+db"
+            !AutoRefreshConfig.isReadingDataStoreEnabled(context) -> "cache_store_disabled"
+            else -> "fallback_cache"
+        }
         return PreviewResult(
             bmp,
             "微信读书月历 month=${calendarTitleLabel(data, s)} source=$source stackOrder=${s.calendarStackOrder} activeDays=$activeDays daysWithCover=$coveredDays records=${data.matchedRows} 输出=${canvasSizeText(s)}"
@@ -772,6 +786,10 @@ object AutoWallpaperGenerator {
         val gridStart = frame.gridStart
 
         val liveData = buildLiveNeoCalendarData(context, s, monthStart, monthEnd, weekRows, gridStart)
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "calendar wallpaper data store disabled, use live Neo data")
+            return liveData
+        }
         val storedData = buildStoredNeoCalendarData(context, s, monthStart, monthEnd, weekRows, gridStart)
         if (storedData != null) {
             AutoRefreshLog.i(
@@ -934,8 +952,10 @@ object AutoWallpaperGenerator {
             context,
             "calendar wallpaper data month=${fmt(monthStart)} stackOrder=${s.calendarStackOrder} rows=$rows metadata=${metadata.size} matched=$matchedRows unmatched=$unmatchedRows daysWithBooks=${cells.count { it.inMonth && it.books.isNotEmpty() }} querySucceeded=$querySucceeded"
         )
-        if (querySucceeded) {
+        if (querySucceeded && AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
             persistNeoCalendarEstimates(context, cells)
+        } else if (querySucceeded) {
+            AutoRefreshLog.i(context, "calendar persisted neo estimates skip: data store disabled")
         } else {
             AutoRefreshLog.i(
                 context,
@@ -1255,6 +1275,10 @@ object AutoWallpaperGenerator {
         captureSnapshot: Boolean = true
     ) {
         if (!stats.ok) return
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "WeRead data store persist skip disabled")
+            return
+        }
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val monthStart = Calendar.getInstance(TimeZone.getDefault()).apply {
             timeInMillis = monthStartMs

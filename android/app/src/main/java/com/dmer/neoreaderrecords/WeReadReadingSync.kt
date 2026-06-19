@@ -9,6 +9,10 @@ import java.util.TimeZone
 
 object WeReadReadingSync {
     fun syncCurrentMonth(context: Context, reason: String): Boolean {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) {
+            AutoRefreshLog.i(context, "WeRead snapshot sync skip data store disabled reason=$reason")
+            return false
+        }
         val monthStart = Calendar.getInstance(TimeZone.getDefault()).apply {
             set(Calendar.DAY_OF_MONTH, 1)
             set(Calendar.HOUR_OF_DAY, 0)
@@ -42,6 +46,7 @@ object WeReadReadingSync {
         monthStartMs: Long,
         stats: WeReadClient.WallpaperStatsResult
     ): Boolean {
+        if (!AutoRefreshConfig.isReadingDataStoreEnabled(context)) return false
         if (!stats.ok || !isCurrentMonth(monthStartMs)) return false
         val prefs = context.getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()

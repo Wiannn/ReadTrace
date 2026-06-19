@@ -5,6 +5,7 @@ import android.content.Context
 object AutoRefreshConfig {
     const val PREFS_NAME = "wallpaper_settings"
     const val KEY_AUTO_ENABLED = "auto_refresh_enabled"
+    const val KEY_READING_DATA_STORE_ENABLED = "reading_data_store_enabled"
     const val KEY_AUTO_MODE = "auto_refresh_mode"
     const val KEY_DAILY_TIME = "auto_daily_time"
     const val KEY_SCREEN_OFF_MIN_INTERVAL = "auto_screen_off_min_interval_minutes"
@@ -18,6 +19,11 @@ object AutoRefreshConfig {
     fun isEnabled(context: Context): Boolean {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean(KEY_AUTO_ENABLED, true)
+    }
+
+    fun isReadingDataStoreEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_READING_DATA_STORE_ENABLED, false)
     }
 
     fun mode(context: Context): String {
