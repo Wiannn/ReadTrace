@@ -978,7 +978,7 @@ class MainActivity : ComponentActivity() {
             1201 to "统计壁纸\n生成阅读账单图片",
             1202 to "当前阅读封面\n使用当前来源的最近封面",
             1203 to "自动封面优先\n有封面用封面，否则用账单",
-            1204 to "月历封面墙\n按天堆叠本地阅读封面"
+            1204 to "月历封面墙\n按天展示所选来源数据"
         )
         val wallpaperNames = listOf("STATS", "COVER", "AUTO_COVER", "CALENDAR")
         wallpaperModeGroup = makeRadioGroup(wallpaperOptions, selectedId(prefs.getString("wallpaper_mode", "STATS") ?: "STATS", 1201, wallpaperOptions, wallpaperNames))
@@ -1105,7 +1105,7 @@ class MainActivity : ComponentActivity() {
         val sourceSegment = bindSegmented("数据来源", sourceGroup, sourceOptions, isVertical = true)
         addHint("说明：Neo 阅读器读取文石本地数据库，适合离线使用；微信读书需要联网读取 API；混合来源会把本地和微信的统计时长相加，书单按阅读时长合并排序，封面按最近阅读来源选择，失败时回退另一来源。混合来源包含联网数据，因此自动模式下不会在熄屏瞬间请求网络，而是在解锁后刷新，通常下一次锁屏看到新图；如果微信读书读取失败，会继续使用本地数据。")
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
-        val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单；月历封面墙目前使用 Neo 阅读器本地阅读事件生成月视图，由于部分设备的统计事件不带书籍路径，会按阅读时间和书库最近访问时间做近似匹配。提示：Neo 封面依赖本地元数据落库，通常退出当前书籍后再锁屏更容易刷新；微信封面在解锁后生成，通常下一次锁屏显示最新结果。")
+        val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单；月历封面墙按所选来源读取数据，Neo 使用本地阅读事件，微信读书使用精确每日总时长和快照差分确认的日级书籍。提示：Neo 封面依赖本地元数据落库，通常退出当前书籍后再锁屏更容易刷新；微信数据在解锁后生成，通常下一次锁屏显示最新结果。")
         val calendarStackOrderSegment = bindSegmented(
             "月历封面堆叠顺序",
             calendarStackOrderGroup,
@@ -1878,7 +1878,7 @@ class MainActivity : ComponentActivity() {
             "COVER" -> AutoWallpaperGenerator.buildWeReadCoverPreviewFromPrefs(applicationContext, "W")
             "AUTO_COVER" -> AutoWallpaperGenerator.buildWeReadCoverPreviewFromPrefs(applicationContext, "W")
                 ?: AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
-            "CALENDAR" -> AutoWallpaperGenerator.buildLocalCalendarPreviewFromPrefs(applicationContext, "M")
+            "CALENDAR" -> AutoWallpaperGenerator.buildWeReadCalendarPreviewFromPrefs(applicationContext, "W")
             else -> AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
         }
     }

@@ -75,7 +75,8 @@ object AutoWallpaperGenerator {
         val cells: List<CalendarDayCell>,
         val statsRows: Int,
         val matchedRows: Int,
-        val unmatchedRows: Int
+        val unmatchedRows: Int,
+        val footerLabel: String = "Neo 本地月历 · 近似匹配"
     )
     private data class CalendarMonthFrame(
         val monthStart: Long,
@@ -161,13 +162,11 @@ object AutoWallpaperGenerator {
         AutoRefreshLog.i(context, "WeRead auto generator start reason=$reason")
         return runCatching {
             val s = readSettings(context)
-            if (s.wallpaperMode != "STATS") {
+            if (s.wallpaperMode != "STATS" && s.wallpaperMode != "CALENDAR") {
                 WeReadReadingSync.syncCurrentMonth(context, "weread_auto_$reason")
             }
             val built = buildWeReadPreviewForWallpaperMode(context, s.wallpaperMode) ?: return false
-            if ((reason.startsWith("screen_on_prewarm") || reason.startsWith("user_present_prewarm")) &&
-                built.summary.contains("source=fallback_cache")
-            ) {
+            if (built.summary.contains("source=fallback_cache")) {
                 AutoRefreshLog.i(context, "WeRead auto skip saving fallback cache and request retry ${built.summary}")
                 return false
             }
@@ -374,6 +373,14 @@ object AutoWallpaperGenerator {
         }.getOrNull()
     }
 
+    fun buildWeReadCalendarPreviewFromPrefs(context: Context, sourceMark: String = "W"): PreviewResult? {
+        return runCatching {
+            val syncOk = WeReadReadingSync.syncCurrentMonth(context, "calendar_preview")
+            val s = readSettings(context)
+            buildWeReadCalendarPreviewForSettings(context, s, sourceMark, syncOk)
+        }.getOrNull()
+    }
+
     fun buildMixedPreviewFromPrefs(context: Context, sourceMark: String = "A"): PreviewResult? {
         return runCatching {
             val s = readSettings(context)
@@ -402,7 +409,7 @@ object AutoWallpaperGenerator {
             "COVER" -> buildWeReadCoverPreviewFromPrefs(context, "W")
             "AUTO_COVER" -> buildWeReadCoverPreviewFromPrefs(context, "W")
                 ?: buildWeReadStatsPreviewFromPrefs(context, "W")
-            "CALENDAR" -> buildLocalCalendarPreviewFromPrefs(context, "M")
+            "CALENDAR" -> buildWeReadCalendarPreviewFromPrefs(context, "W")
             else -> buildWeReadStatsPreviewFromPrefs(context, "W")
         }
     }
@@ -512,6 +519,109 @@ object AutoWallpaperGenerator {
         return PreviewResult(
             bmp,
             "月历封面墙 month=$monthLabel stackOrder=${s.calendarStackOrder} daysWithCover=$coveredDays rows=${data.statsRows} matched=${data.matchedRows} unmatched=${data.unmatchedRows} 输出=${canvasSizeText(s)}"
+        )
+    }
+
+    private fun buildWeReadCalendarPreviewForSettings(
+        context: Context,
+        s: AutoSettings,
+        sourceMark: String,
+        syncOk: Boolean
+    ): PreviewResult? {
+        val range = resolvePeriodRange(s)
+        val frame = calendarFrameForSettings(s, range)
+        val data = buildStoredWeReadCalendarData(
+            context,
+            s,
+            frame.monthStart,
+            frame.monthEnd,
+            frame.weekRows,
+            frame.gridStart
+        ) ?: return null
+        val bmp = drawCalendarWallpaper(context, data, s, sourceMark)
+        val activeDays = data.cells.count { it.inMonth && it.totalMs > 0L }
+        val coveredDays = data.cells.count { it.inMonth && it.books.isNotEmpty() }
+        val source = if (syncOk) "network+db" else "fallback_cache"
+        return PreviewResult(
+            bmp,
+            "微信读书月历 month=${calendarTitleLabel(data, s)} source=$source stackOrder=${s.calendarStackOrder} activeDays=$activeDays daysWithCover=$coveredDays records=${data.matchedRows} 输出=${canvasSizeText(s)}"
+        )
+    }
+
+    private fun buildStoredWeReadCalendarData(
+        context: Context,
+        s: AutoSettings,
+        monthStart: Long,
+        monthEnd: Long,
+        weekRows: Int,
+        gridStart: Long
+    ): CalendarBuildData? {
+        val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val startDate = dateFmt.format(Date(monthStart))
+        val endDate = dateFmt.format(Date(monthEnd))
+        val totals = ReadingDataStore.queryDailyTotals(context, "WEREAD", startDate, endDate)
+        val records = ReadingDataStore.queryDailyBooks(context, "WEREAD", startDate, endDate)
+            .filter { record ->
+                (s.includeUnread || record.status != 0) &&
+                    (s.readingFilterMode != "READING_ONLY" || record.status == 1) &&
+                    (s.readingFilterMode != "FINISHED_ONLY" || record.status == 2)
+            }
+        if (totals.isEmpty() && records.isEmpty()) {
+            AutoRefreshLog.i(context, "WeRead calendar database empty range=$startDate~$endDate")
+            return null
+        }
+        val totalsByDate = totals.associateBy { it.date }
+        val recordsByDate = records.groupBy { it.date }
+        val cells = (0 until weekRows * 7).map { index ->
+            val dayMs = gridStart + index * DAY_MS
+            val dc = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = dayMs }
+            val dayKey = dateFmt.format(Date(dayMs))
+            val dayRecords = recordsByDate[dayKey].orEmpty()
+            val selectedRecords = when (s.calendarStackOrder) {
+                "SHORTEST_TOP" -> dayRecords.sortedBy { it.durationMs }
+                "LATEST_TOP" -> dayRecords.sortedByDescending { it.lastSeenAt }
+                else -> dayRecords.sortedByDescending { it.durationMs }
+            }.take(4)
+            val books = orderCalendarStack(
+                selectedRecords.map { record ->
+                    CalendarCoverItem(
+                        title = record.title,
+                        author = record.author,
+                        path = record.bookKey,
+                        status = record.status,
+                        durationMs = record.durationMs,
+                        lastSeenAt = record.lastSeenAt,
+                        bitmap = record.coverCachePath
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { BitmapFactory.decodeFile(it) }
+                    )
+                },
+                s.calendarStackOrder
+            )
+            val totalMs = totalsByDate[dayKey]?.durationMs ?: dayRecords.sumOf { it.durationMs }
+            CalendarDayCell(
+                dayStartMs = dayMs,
+                dayOfMonth = dc.get(Calendar.DAY_OF_MONTH),
+                inMonth = dayMs in monthStart..monthEnd,
+                totalMs = totalMs,
+                eventCount = if (totalMs > 0L) 1 else 0,
+                unmatchedCount = if (totalMs > 0L && books.isEmpty()) 1 else 0,
+                books = books
+            )
+        }
+        AutoRefreshLog.i(
+            context,
+            "WeRead calendar data source=db range=$startDate~$endDate totals=${totals.size} dailyBooks=${records.size} activeDays=${cells.count { it.inMonth && it.totalMs > 0L }} daysWithBooks=${cells.count { it.inMonth && it.books.isNotEmpty() }}"
+        )
+        return CalendarBuildData(
+            monthStartMs = monthStart,
+            monthEndMs = monthEnd,
+            weekRows = weekRows,
+            cells = cells,
+            statsRows = totals.size,
+            matchedRows = records.size,
+            unmatchedRows = cells.count { it.inMonth && it.totalMs > 0L && it.books.isEmpty() },
+            footerLabel = "微信读书月历 · W=微信 · 封面来自快照差分"
         )
     }
 
@@ -1674,7 +1784,8 @@ object AutoWallpaperGenerator {
             .filter { it.inMonth }
             .flatMap { it.books }
             .distinctBy { it.path.ifBlank { it.title } }
-        val averagePerActiveDay = if (coveredDays > 0) totalDuration / coveredDays else 0L
+        val activeDays = data.cells.count { it.inMonth && it.totalMs > 0L }
+        val averagePerActiveDay = if (activeDays > 0) totalDuration / activeDays else 0L
         canvas.drawText("总时长 ${compactDuration(totalDuration)}", w - marginX, top + title.textSize * 0.46f, summaryPaint)
         summaryPaint.typeface = Typeface.create(bodyFace, Typeface.NORMAL)
         canvas.drawText("日均 ${compactDuration(averagePerActiveDay)} · 读过${uniqueBooks.size}本", w - marginX, top + title.textSize * 0.82f, summaryPaint)
@@ -1731,12 +1842,21 @@ object AutoWallpaperGenerator {
                 } else if (cell.inMonth && cell.eventCount > 0) {
                     smallPaint.color = muted
                     smallPaint.textAlign = Paint.Align.LEFT
-                    canvas.drawText("未匹配", x0 + colW * 0.08f, y0 + rowH * 0.52f, smallPaint)
+                    canvas.drawText("仅时长", x0 + colW * 0.08f, y0 + rowH * 0.52f, smallPaint)
+                    if (cell.totalMs > 0L) {
+                        drawCalendarOutlineDuration(
+                            canvas,
+                            compactDuration(cell.totalMs),
+                            x0 + colW * 0.92f,
+                            y0 + rowH * 0.88f,
+                            bodyFace
+                        )
+                    }
                 }
             }
         }
 
-        val note = "Neo 本地月历 · ${coveredDays}天有封面 · 近似匹配"
+        val note = "${data.footerLabel} · ${coveredDays}天有封面"
         smallPaint.color = muted
         smallPaint.textAlign = Paint.Align.LEFT
         canvas.drawText(note, marginX, h - h * 0.024f, smallPaint)

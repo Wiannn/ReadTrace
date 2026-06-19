@@ -399,6 +399,48 @@ object ReadingDataStore {
         return countRows(context, TABLE_PERIOD_BOOKS, "source = ?", arrayOf(source))
     }
 
+    fun queryDailyTotals(
+        context: Context,
+        source: String,
+        startDate: String,
+        endDate: String
+    ): List<DailyTotalRecord> {
+        return runCatching {
+            val out = mutableListOf<DailyTotalRecord>()
+            Helper(context.applicationContext).readableDatabase.use { db ->
+                db.query(
+                    TABLE_DAILY_TOTALS,
+                    arrayOf("date", "source", "duration_ms", "confidence", "updated_at"),
+                    "source = ? AND date >= ? AND date <= ?",
+                    arrayOf(source, startDate, endDate),
+                    null,
+                    null,
+                    "date ASC"
+                ).use { c ->
+                    while (c.moveToNext()) {
+                        out.add(
+                            DailyTotalRecord(
+                                date = c.getString(0),
+                                source = c.getString(1),
+                                durationMs = c.getLong(2),
+                                confidence = c.getString(3),
+                                updatedAt = c.getLong(4)
+                            )
+                        )
+                    }
+                }
+            }
+            out
+        }.getOrElse {
+            AutoRefreshLog.e(
+                context,
+                "ReadingDataStore daily totals query failed source=$source range=$startDate~$endDate",
+                it
+            )
+            emptyList()
+        }
+    }
+
     fun queryWeReadBookStates(context: Context): Map<String, WeReadBookState> {
         return runCatching {
             val out = linkedMapOf<String, WeReadBookState>()
