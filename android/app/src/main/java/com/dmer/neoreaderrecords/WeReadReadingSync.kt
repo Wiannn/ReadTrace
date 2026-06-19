@@ -59,6 +59,7 @@ object WeReadReadingSync {
 
         val priorStates = ReadingDataStore.queryWeReadBookStates(context)
         val baseline = priorStates.isEmpty()
+        val historyImportPending = !ReadingDataStore.isWeReadShelfHistoryImported(context)
         val changedKeys = if (baseline) {
             emptySet()
         } else {
@@ -67,6 +68,13 @@ object WeReadReadingSync {
                     book.readUpdateTimeMs > (priorStates[book.bookKey]?.lastReadAt ?: 0L)
                 }
                 .mapTo(linkedSetOf()) { it.bookKey }
+        }
+        val historyKeys = if (historyImportPending) {
+            shelf.books
+                .filter { it.readUpdateTimeMs in monthStartMs..now }
+                .mapTo(linkedSetOf()) { it.bookKey }
+        } else {
+            emptySet()
         }
         val rankingDurationByKey = stats.books.associate { it.bookId to it.readSeconds * 1000L }
         val changedSummary = shelf.books
@@ -82,6 +90,14 @@ object WeReadReadingSync {
         }
         val enriched = linkedMapOf<String, EnrichedBook>()
         shelf.books
+            .filter { it.bookKey in historyKeys }
+            .forEach { book ->
+                enriched[book.bookKey] = EnrichedBook(
+                    coverPath = WeReadClient.cacheShelfBookCover(context, book),
+                    progress = null
+                )
+            }
+        shelf.books
             .filter { it.bookKey in changedKeys }
             .take(MAX_CHANGED_BOOK_DETAILS)
             .forEach { book ->
@@ -92,7 +108,10 @@ object WeReadReadingSync {
                     WeReadClient.fetchBookProgress(context, apiKey, book.bookKey)
                         .takeIf { it.ok }
                 }
-                enriched[book.bookKey] = EnrichedBook(coverPath, progress)
+                enriched[book.bookKey] = EnrichedBook(
+                    coverPath = coverPath ?: enriched[book.bookKey]?.coverPath,
+                    progress = progress
+                )
             }
 
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -140,7 +159,7 @@ object WeReadReadingSync {
         ) ?: return false
         AutoRefreshLog.i(
             context,
-            "WeRead snapshot applied baseline=${applied.baseline} trackingStart=${applied.trackingStartDate} shelf=${shelf.books.size} changedDetected=${changedKeys.size} changedApplied=${applied.changedBooks} dailyWritten=${applied.dailyRecordsWritten} ranking=${rankingDurationByKey.size} enriched=${enriched.size}"
+            "WeRead snapshot applied baseline=${applied.baseline} historyPending=$historyImportPending historyCandidates=${historyKeys.size} historyImported=${applied.historyImported} historyWritten=${applied.historyRecordsWritten} trackingStart=${applied.trackingStartDate} shelf=${shelf.books.size} changedDetected=${changedKeys.size} changedApplied=${applied.changedBooks} dailyWritten=${applied.dailyRecordsWritten} ranking=${rankingDurationByKey.size} enriched=${enriched.size}"
         )
         prefs.edit().putLong(KEY_LAST_CAPTURE_MS, now).apply()
         return true

@@ -71,6 +71,8 @@ object ReadingDataStore {
 
     data class WeReadSnapshotApplyResult(
         val baseline: Boolean,
+        val historyImported: Boolean,
+        val historyRecordsWritten: Int,
         val changedBooks: Int,
         val dailyRecordsWritten: Int,
         val trackingStartDate: String
@@ -467,6 +469,25 @@ object ReadingDataStore {
         }
     }
 
+    fun isWeReadShelfHistoryImported(context: Context): Boolean {
+        return runCatching {
+            Helper(context.applicationContext).readableDatabase.use { db ->
+                db.query(
+                    TABLE_SYNC_META,
+                    arrayOf("value"),
+                    "key = ?",
+                    arrayOf(KEY_WEREAD_SHELF_HISTORY_IMPORTED),
+                    null,
+                    null,
+                    null
+                ).use { c -> c.moveToFirst() && c.getString(0) == "1" }
+            }
+        }.getOrElse {
+            AutoRefreshLog.e(context, "ReadingDataStore WeRead history meta query failed", it)
+            false
+        }
+    }
+
     fun applyWeReadSnapshot(
         context: Context,
         periodStart: String,
@@ -477,6 +498,8 @@ object ReadingDataStore {
         return runCatching {
             val now = System.currentTimeMillis()
             var baseline = false
+            var historyImported = false
+            var historyWritten = 0
             var changedBooks = 0
             var dailyWritten = 0
             var trackingStartDate = trackingDate
@@ -531,6 +554,15 @@ object ReadingDataStore {
                         },
                         SQLiteDatabase.CONFLICT_IGNORE
                     )
+                    historyImported = db.query(
+                        TABLE_SYNC_META,
+                        arrayOf("value"),
+                        "key = ?",
+                        arrayOf(KEY_WEREAD_SHELF_HISTORY_IMPORTED),
+                        null,
+                        null,
+                        null
+                    ).use { c -> !c.moveToFirst() || c.getString(0) != "1" }
 
                     val priorPeriodDurations = linkedMapOf<String, Long>()
                     db.query(
@@ -552,6 +584,46 @@ object ReadingDataStore {
                             !book.readDate.isNullOrBlank() &&
                             book.readDate >= trackingStartDate &&
                             book.readDate <= trackingDate
+                        val historyCandidate = historyImported &&
+                            !changed &&
+                            !book.readDate.isNullOrBlank() &&
+                            book.readDate >= periodStart &&
+                            book.readDate <= trackingDate
+                        if (historyCandidate) {
+                            val readDate = requireNotNull(book.readDate)
+                            val alreadyRecorded = db.query(
+                                TABLE_DAILY_BOOKS,
+                                arrayOf("confidence"),
+                                "date = ? AND source = ? AND book_key = ?",
+                                arrayOf(readDate, "WEREAD", book.bookKey),
+                                null,
+                                null,
+                                null
+                            ).use { c -> c.moveToFirst() }
+                            if (!alreadyRecorded) {
+                                db.insertWithOnConflict(
+                                    TABLE_DAILY_BOOKS,
+                                    null,
+                                    ContentValues().apply {
+                                        put("date", readDate)
+                                        put("source", "WEREAD")
+                                        put("book_key", book.bookKey)
+                                        put("title", book.title)
+                                        put("author", book.author)
+                                        put("cover_cache_path", book.coverCachePath)
+                                        put("duration_ms", 0L)
+                                        put("progress", book.progress)
+                                        put("status", book.status)
+                                        put("confidence", "SHELF_HISTORY")
+                                        put("last_seen_at", book.lastReadAt)
+                                        put("updated_at", now)
+                                    },
+                                    SQLiteDatabase.CONFLICT_IGNORE
+                                )
+                                historyWritten += 1
+                                dailyWritten += 1
+                            }
+                        }
                         if (changed) {
                             val readDate = requireNotNull(book.readDate)
                             changedBooks += 1
@@ -643,12 +715,30 @@ object ReadingDataStore {
                             )
                         }
                     }
+                    if (historyImported) {
+                        db.insertWithOnConflict(
+                            TABLE_SYNC_META,
+                            null,
+                            ContentValues().apply {
+                                put("key", KEY_WEREAD_SHELF_HISTORY_IMPORTED)
+                                put("value", "1")
+                            },
+                            SQLiteDatabase.CONFLICT_REPLACE
+                        )
+                    }
                     db.setTransactionSuccessful()
                 } finally {
                     db.endTransaction()
                 }
             }
-            WeReadSnapshotApplyResult(baseline, changedBooks, dailyWritten, trackingStartDate)
+            WeReadSnapshotApplyResult(
+                baseline = baseline,
+                historyImported = historyImported,
+                historyRecordsWritten = historyWritten,
+                changedBooks = changedBooks,
+                dailyRecordsWritten = dailyWritten,
+                trackingStartDate = trackingStartDate
+            )
         }.getOrElse {
             AutoRefreshLog.e(context, "ReadingDataStore WeRead snapshot apply failed", it)
             null
@@ -734,4 +824,6 @@ object ReadingDataStore {
             }
         }.getOrDefault(0)
     }
+
+    private const val KEY_WEREAD_SHELF_HISTORY_IMPORTED = "weread_shelf_history_imported_v1"
 }
