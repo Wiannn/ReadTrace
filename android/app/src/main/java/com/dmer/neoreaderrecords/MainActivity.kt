@@ -526,8 +526,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun booxPresetKeyByRadioId(id: Int): String {
-        if (id == 1301 + BooxDevicePresets.all.size) return BooxDevicePresets.CUSTOM_KEY
-        return BooxDevicePresets.all.getOrNull(id - 1301)?.key ?: BooxDevicePresets.DEFAULT_KEY
+        if (id == 1301) return BooxDevicePresets.CUSTOM_KEY
+        return BooxDevicePresets.all.getOrNull(id - 1302)?.key ?: BooxDevicePresets.DEFAULT_KEY
     }
 
     private fun wallpaperSizeDisplayText(settings: Settings): String {
@@ -1019,11 +1019,11 @@ class MainActivity : ComponentActivity() {
 
         val matchedBooxPreset = detectBooxDevicePresetOrNull()
         val detectedBooxPreset = matchedBooxPreset ?: BooxDevicePresets.DEFAULT_KEY
-        val booxDevicePresetOptions = BooxDevicePresets.all.mapIndexed { index, preset ->
+        val booxDevicePresetOptions = listOf(1301 to "自定义分辨率\n手动输入宽度和高度") + BooxDevicePresets.all.mapIndexed { index, preset ->
             val matchMark = if (matchedBooxPreset != null && preset.key == matchedBooxPreset) " [本机匹配]" else ""
-            (1301 + index) to "${preset.label}$matchMark\n${preset.inchText} ${preset.heightPx}x${preset.widthPx}"
-        } + listOf((1301 + BooxDevicePresets.all.size) to "自定义分辨率\n手动输入宽度和高度")
-        val booxDevicePresetNames = BooxDevicePresets.all.map { it.key } + BooxDevicePresets.CUSTOM_KEY
+            (1302 + index) to "${preset.label}$matchMark\n${preset.inchText} ${preset.heightPx}x${preset.widthPx}"
+        }
+        val booxDevicePresetNames = listOf(BooxDevicePresets.CUSTOM_KEY) + BooxDevicePresets.all.map { it.key }
         val hasManualBooxPreset = prefs.getBoolean("boox_device_preset_user_set", false)
         val defaultBooxDevicePreset = if (hasManualBooxPreset && prefs.contains("boox_device_preset")) {
             prefs.getString("boox_device_preset", BooxDevicePresets.DEFAULT_KEY) ?: BooxDevicePresets.DEFAULT_KEY
