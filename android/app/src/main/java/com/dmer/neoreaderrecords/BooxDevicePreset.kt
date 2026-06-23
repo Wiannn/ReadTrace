@@ -12,6 +12,7 @@ data class BooxDevicePreset(
 
 object BooxDevicePresets {
     const val DEFAULT_KEY = "LEAF5"
+    const val CUSTOM_KEY = "CUSTOM"
 
     val all: List<BooxDevicePreset> = listOf(
         BooxDevicePreset("POKE6S", "Poke6S", "6英寸", 758, 1024),

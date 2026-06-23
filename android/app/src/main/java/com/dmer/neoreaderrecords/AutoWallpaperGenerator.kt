@@ -89,6 +89,7 @@ object AutoWallpaperGenerator {
         val gridStart: Long
     )
     private data class ChartStats(val totalMs: Long, val points: LongArray, val labels: List<String>)
+    private data class WallpaperSize(val label: String, val width: Int, val height: Int)
     private data class WeReadBuildData(
         val rangeStart: Long,
         val rangeEnd: Long,
@@ -124,6 +125,8 @@ object AutoWallpaperGenerator {
         val serialNumberCustom: String,
         val serialNumberSize: Float,
         val booxDevicePreset: String,
+        val customWallpaperWidth: Int,
+        val customWallpaperHeight: Int,
         val footerMode: String,
         val barcodeWidthScale: Float,
         val barcodeGapMode: String,
@@ -1151,8 +1154,17 @@ object AutoWallpaperGenerator {
     }
 
     private fun canvasSizeText(s: AutoSettings): String {
-        val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
-        return "${preset.label} ${preset.widthPx}x${preset.heightPx}"
+        val size = resolveWallpaperSize(s)
+        return "${size.label} ${size.width}x${size.height}"
+    }
+
+    private fun resolveWallpaperSize(s: AutoSettings): WallpaperSize {
+        return if (s.booxDevicePreset == BooxDevicePresets.CUSTOM_KEY) {
+            WallpaperSize("自定义", s.customWallpaperWidth.coerceIn(300, 4000), s.customWallpaperHeight.coerceIn(300, 4000))
+        } else {
+            val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
+            WallpaperSize(preset.label, preset.widthPx, preset.heightPx)
+        }
     }
 
     private fun buildWeReadStatsForSettings(context: Context, s: AutoSettings): WeReadBuildData? {
@@ -1863,9 +1875,9 @@ object AutoWallpaperGenerator {
     }
 
     private fun renderCoverWallpaper(context: Context, cover: Bitmap, title: String, sourceMark: String, s: AutoSettings): Bitmap {
-        val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
-        val w = preset.widthPx
-        val h = preset.heightPx
+        val size = resolveWallpaperSize(s)
+        val w = size.width
+        val h = size.height
         val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(Color.WHITE)
@@ -1881,9 +1893,9 @@ object AutoWallpaperGenerator {
     }
 
     private fun drawCalendarWallpaper(context: Context, data: CalendarBuildData, s: AutoSettings, sourceMark: String): Bitmap {
-        val preset = BooxDevicePresets.byKey(s.booxDevicePreset)
-        val w = preset.widthPx
-        val h = preset.heightPx
+        val size = resolveWallpaperSize(s)
+        val w = size.width
+        val h = size.height
         val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         val bg = Color.rgb(247, 242, 234)
@@ -2180,6 +2192,8 @@ object AutoWallpaperGenerator {
             serialNumberCustom = (p.getString("serial_number_custom", "") ?: "").filter { it.isDigit() }.take(12),
             serialNumberSize = p.getFloat("serial_number_size", 46f).coerceIn(24f, 140f),
             booxDevicePreset = p.getString("boox_device_preset", BooxDevicePresets.DEFAULT_KEY) ?: BooxDevicePresets.DEFAULT_KEY,
+            customWallpaperWidth = p.getInt("custom_wallpaper_width", BooxDevicePresets.byKey(BooxDevicePresets.DEFAULT_KEY).widthPx).coerceIn(300, 4000),
+            customWallpaperHeight = p.getInt("custom_wallpaper_height", BooxDevicePresets.byKey(BooxDevicePresets.DEFAULT_KEY).heightPx).coerceIn(300, 4000),
             footerMode = p.getString("footer_mode", "NONE") ?: "NONE",
             barcodeWidthScale = p.getFloat("barcode_width_scale", 1.0f).coerceIn(0.6f, 1.6f),
             barcodeGapMode = p.getString("barcode_gap_mode", "STANDARD") ?: "STANDARD",
@@ -2202,9 +2216,9 @@ object AutoWallpaperGenerator {
         s0: AutoSettings,
         sourceMark: String
     ): Bitmap {
-        val devicePreset = BooxDevicePresets.byKey(s0.booxDevicePreset)
-        val w = devicePreset.widthPx
-        val h = devicePreset.heightPx
+        val wallpaperSize = resolveWallpaperSize(s0)
+        val w = wallpaperSize.width
+        val h = wallpaperSize.height
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.drawColor(Color.WHITE)
@@ -2253,7 +2267,7 @@ object AutoWallpaperGenerator {
         drawFittedText(c, serialValue, leftMargin + prefixWidth, serialBaseY, serialNumberPaint, (summaryLeft - leftMargin - prefixWidth - s(24f)).coerceAtLeast(s(180f)), Paint.Align.LEFT, 0.7f)
         drawFittedText(c, "操作编号: ${System.currentTimeMillis().toString().takeLast(6)}", leftMargin, y + s(95f), text, leftInfoMaxWidth, Paint.Align.LEFT, 0.78f)
         drawFittedText(c, "时间: ${fmt(rangeStart)} - ${fmt(rangeEnd)}", leftMargin, y + s(145f), text, leftInfoMaxWidth, Paint.Align.LEFT, 0.78f)
-        drawFittedText(c, "设备: ${devicePreset.label}", leftMargin, y + s(195f), text, leftInfoMaxWidth, Paint.Align.LEFT, 0.78f)
+        drawFittedText(c, "设备: ${wallpaperSize.label}", leftMargin, y + s(195f), text, leftInfoMaxWidth, Paint.Align.LEFT, 0.78f)
         drawFittedText(c, "时长: ${formatDuration(stats.totalMs, s0.timeUnit)}", rightEdge, y + s(145f), h1, summaryWidth, Paint.Align.RIGHT, 0.76f)
         drawFittedText(c, "书籍: ${books.size}", rightEdge, y + s(195f), text, summaryWidth, Paint.Align.RIGHT, 0.78f)
 
