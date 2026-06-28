@@ -2177,17 +2177,122 @@ class MainActivity : ComponentActivity() {
                     .append('\n')
             }
         }
+        appendAnnotationMatchProbe(out)
         localNoteProbeReport = out.toString().ifBlank { "<empty>" }
+    }
+
+    private fun appendAnnotationMatchProbe(out: StringBuilder) {
+        val metaByKey = linkedMapOf<String, String>()
+        runCatching {
+            contentResolver.query(
+                metadataUri,
+                arrayOf("title", "nativeAbsolutePath", "uuid", "guid", "id", "idString"),
+                null,
+                null,
+                null
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    fun col(name: String): String {
+                        val i = c.getColumnIndex(name)
+                        if (i < 0 || c.isNull(i)) return ""
+                        return runCatching { c.getString(i) ?: "" }.getOrDefault("")
+                    }
+                    val title = col("title").ifBlank { File(col("nativeAbsolutePath")).nameWithoutExtension }
+                    listOf("uuid", "guid", "id", "idString").forEach { keyName ->
+                        val value = col(keyName)
+                        if (value.isNotBlank()) {
+                            metaByKey[value] = "$keyName=$value -> ${title.take(60)}"
+                        }
+                    }
+                }
+            }
+        }
+        out.append("annotationMatchProbe=").append('\n')
+        out.append("  metadataKeys=").append(metaByKey.size).append('\n')
+        val annotationUri = Uri.parse("content://com.onyx.content.database.ContentProvider/Annotation")
+        runCatching {
+            contentResolver.query(annotationUri, null, null, null, "updatedAt DESC")?.use { c ->
+                appendAnnotationRows(out, c, metaByKey)
+            } ?: out.append("  query=null\n")
+        }.onFailure { first ->
+            out.append("  sort=updatedAt DESC failed ")
+                .append(first.javaClass.simpleName)
+                .append(':')
+                .append(first.message?.take(140) ?: "")
+                .append('\n')
+            runCatching {
+                contentResolver.query(annotationUri, null, null, null, null)?.use { c ->
+                    appendAnnotationRows(out, c, metaByKey)
+                } ?: out.append("  fallbackQuery=null\n")
+            }.onFailure { second ->
+                out.append("  fallback failed ")
+                    .append(second.javaClass.simpleName)
+                    .append(':')
+                    .append(second.message?.take(140) ?: "")
+                    .append('\n')
+            }
+        }
+    }
+
+    private fun appendAnnotationRows(out: StringBuilder, c: android.database.Cursor, metaByKey: Map<String, String>) {
+        fun col(name: String): String {
+            val i = c.getColumnIndex(name)
+            if (i < 0 || c.isNull(i)) return ""
+            return runCatching { c.getString(i) ?: "" }.getOrDefault("")
+        }
+        var checked = 0
+        var quoteRows = 0
+        var noteRows = 0
+        var objMatches = 0
+        val samples = StringBuilder()
+        while (c.moveToNext()) {
+            checked++
+            val quote = col("quote")
+            val note = col("note").ifBlank { col("linkNote") }
+            if (quote.isNotBlank()) quoteRows++
+            if (note.isNotBlank()) noteRows++
+            val objId = col("objId")
+            val matched = metaByKey[objId]
+            if (matched != null) objMatches++
+            if (samples.count { it == '\n' } < 8 && (quote.isNotBlank() || note.isNotBlank())) {
+                samples.append("  row=")
+                    .append(checked)
+                    .append(" match=")
+                    .append(matched ?: "<none>")
+                    .append(" objId=")
+                    .append(objId.take(80))
+                    .append(" chapter=")
+                    .append(col("chapter").take(40))
+                    .append(" page=")
+                    .append(col("pageNumber").take(16))
+                    .append(" createdAt=")
+                    .append(col("createdAt").take(24))
+                    .append(" updatedAt=")
+                    .append(col("updatedAt").take(24))
+                    .append(" quote=")
+                    .append(quote.replace('\n', ' ').replace('\r', ' ').take(120))
+                    .append(" note=")
+                    .append(note.replace('\n', ' ').replace('\r', ' ').take(80))
+                    .append('\n')
+            }
+        }
+        out.append("  annotations=").append(checked)
+            .append(" quoteRows=").append(quoteRows)
+            .append(" noteRows=").append(noteRows)
+            .append(" objMatches=").append(objMatches)
+            .append('\n')
+        out.append(samples.ifBlank { "  sample=<empty>\n" })
     }
 
     private fun sampleCursorColumns(c: android.database.Cursor): String {
         val preferredNames = listOf(
             "title", "bookTitle", "bookName", "name",
-            "content", "note", "text", "markText", "comment", "annotation", "abstract",
+            "quote", "content", "note", "linkNote", "text", "markText", "comment", "annotation", "abstract",
             "path", "nativeAbsolutePath", "bookPath", "filePath",
             "author", "authors",
             "chapterName", "chapter", "chapterTitle",
             "createTime", "updateTime", "lastAccess", "time", "timestamp",
+            "createdAt", "updatedAt", "application", "objId", "uuid", "guid", "id", "idString",
             "page", "pageNumber", "position", "start", "end", "range", "progress"
         )
         val columnNames = c.columnNames.toList()
