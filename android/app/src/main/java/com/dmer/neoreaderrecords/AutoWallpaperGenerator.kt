@@ -2402,11 +2402,11 @@ object AutoWallpaperGenerator {
         val headerBlock = 110f + 30f + 250f + 48f + 28f
         val hasFooter = s0.footerMode != "NONE" && s0.noteText.isNotBlank()
         val hasExcerptMenuBarcodeFooter = excerptMenu && s0.footerMode == "BARCODE" && hasFooter
-        val summaryBlock = if (hasExcerptMenuBarcodeFooter) 30f + 24f else 30f + 60f + 50f
+        val summaryBlock = if (hasExcerptMenuBarcodeFooter) 30f + 52f + 54f + 30f else 30f + 60f + 50f
         val drawChart = s0.showChart && !excerptMenu
         val chartBlock = if (drawChart) 260f else 0f
         val footerBlock = if (!hasFooter) 0f else if (s0.footerMode == "BARCODE") {
-            if (excerptMenu) 170f else 280f
+            if (excerptMenu) 130f else 280f
         } else 130f
         val requiredH = headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
         val fitScale = (h.toFloat() - 40f) / requiredH
@@ -2509,7 +2509,10 @@ object AutoWallpaperGenerator {
         y += s(30f)
         c.drawLine(s(40f), y, w - s(40f), y, line)
         if (hasExcerptMenuBarcodeFooter) {
-            y += s(24f)
+            y += s(52f)
+            drawFittedText(c, "整单备注：${s0.noteText}", leftMargin, y, mono, (rightEdge - leftMargin), Paint.Align.LEFT, 0.72f)
+            y += s(54f)
+            drawFittedText(c, "账单合计: ${menuTotalPriceText(books)}", rightEdge, y, h1, (w * 0.56f), Paint.Align.RIGHT, 0.66f)
         } else if (excerptMenu) {
             y += s(60f)
             drawFittedText(c, "账单合计: ${menuTotalPriceText(books)}", rightEdge, y, h1, (w * 0.54f), Paint.Align.RIGHT, 0.72f)
@@ -2520,9 +2523,9 @@ object AutoWallpaperGenerator {
             drawFittedText(c, "本期合计: ${formatDuration(stats.totalMs, s0.timeUnit)}", rightEdge, y, h1, (w * 0.54f), Paint.Align.RIGHT, 0.72f)
         }
 
-        y += if (hasExcerptMenuBarcodeFooter) s(18f) else s(50f)
+        y += if (hasExcerptMenuBarcodeFooter) s(26f) else s(50f)
         val footerReserved = if (!hasFooter) 0f else if (s0.footerMode == "BARCODE") {
-            if (excerptMenu) s(150f) else s(260f)
+            if (excerptMenu) s(118f) else s(260f)
         } else s(120f)
         val bottomSafe = (h - s(56f)).toFloat()
         val availableChartH = ((bottomSafe - footerReserved - s(24f)) - y).coerceAtLeast(s(70f))
@@ -2571,36 +2574,46 @@ object AutoWallpaperGenerator {
         }
 
         if (hasFooter) {
-            val baseY = if (drawChart) (chartBottomUsed + s(64f)) else (y + s(16f))
+            val baseY = if (drawChart) (chartBottomUsed + s(64f)) else if (hasExcerptMenuBarcodeFooter) y else (y + s(16f))
             c.drawLine(s(40f), baseY, w - s(40f), baseY, line)
             if (s0.footerMode == "NOTE") {
                 drawFittedText(c, "备注: ${s0.noteText}", leftMargin, baseY + s(58f), text, (rightEdge - leftMargin), Paint.Align.LEFT, 0.78f)
             } else if (s0.footerMode == "BARCODE") {
-                val qrSize = if (excerptMenu) s(118f).toInt().coerceAtLeast(88) else s(168f).toInt().coerceAtLeast(120)
+                val bottomSafeForFooter = (h - s(56f)).toFloat()
+                val footerAreaTop = baseY + if (excerptMenu) s(16f) else s(18f)
+                val footerAreaH = (bottomSafeForFooter - footerAreaTop - s(8f)).coerceAtLeast(s(56f))
+                val qrSize = if (excerptMenu) {
+                    minOf(s(112f), footerAreaH * 0.78f).coerceAtLeast(s(64f)).toInt()
+                } else {
+                    s(168f).toInt().coerceAtLeast(120)
+                }
                 val qr = buildQrBitmap(s0.noteText, qrSize)
                 if (qr != null) {
-                    val qrX = s(60f)
-                    val qrY = baseY + if (excerptMenu) s(16f) else s(18f)
-                    c.drawBitmap(qr, qrX, qrY, null)
-                    val decorX = qrX + qr.width + s(24f)
-                    val decorY = qrY + if (excerptMenu) s(14f) else s(10f)
-                    val decorW = if (excerptMenu) {
-                        (w * 0.34f).coerceAtLeast(s(180f))
-                    } else {
-                        (w - decorX - s(60f)).coerceAtLeast(s(220f))
-                    }
-                    val decorH = if (excerptMenu) {
-                        (qr.height - s(28f)).toFloat().coerceAtLeast(s(44f))
-                    } else {
-                        (qr.height - s(20f)).toFloat().coerceAtLeast(s(60f))
-                    }
-                    drawBarcodeDecor(c, decorX, decorY, decorW, decorH, s0.noteText, s0.barcodeWidthScale, s0.barcodeGapMode, black)
                     if (excerptMenu) {
-                        val rightTextX = (decorX + decorW + s(36f)).coerceAtMost(w * 0.62f)
-                        val rightTextW = (rightEdge - rightTextX).coerceAtLeast(s(220f))
-                        drawFittedText(c, "账单合计: ${menuTotalPriceText(books)}", rightEdge, qrY + s(42f), h1, rightTextW, Paint.Align.RIGHT, 0.62f)
-                        drawFittedText(c, s0.noteText, rightEdge, qrY + s(92f), mono, rightTextW, Paint.Align.RIGHT, 0.72f)
+                        val gap = s(24f)
+                        val maxGroupW = (rightEdge - leftMargin).coerceAtLeast(s(260f))
+                        val decorW = (maxGroupW - qr.width - gap)
+                            .coerceAtMost(w * 0.56f)
+                            .coerceAtLeast(s(160f))
+                        val groupW = qr.width + gap + decorW
+                        val groupX = ((w - groupW) / 2f).coerceAtLeast(leftMargin)
+                        val qrY = footerAreaTop + ((footerAreaH - qr.height) / 2f).coerceAtLeast(0f)
+                        val decorH = (footerAreaH * 0.58f)
+                            .coerceAtMost(qr.height * 0.72f)
+                            .coerceAtLeast(s(34f))
+                        val decorX = groupX + qr.width + gap
+                        val decorY = footerAreaTop + ((footerAreaH - decorH) / 2f).coerceAtLeast(0f)
+                        c.drawBitmap(qr, groupX, qrY, null)
+                        drawBarcodeDecor(c, decorX, decorY, decorW, decorH, s0.noteText, s0.barcodeWidthScale, s0.barcodeGapMode, black)
                     } else {
+                        val qrX = s(60f)
+                        val qrY = baseY + s(18f)
+                        c.drawBitmap(qr, qrX, qrY, null)
+                        val decorX = qrX + qr.width + s(24f)
+                        val decorY = qrY + s(10f)
+                        val decorW = (w - decorX - s(60f)).coerceAtLeast(s(220f))
+                        val decorH = (qr.height - s(20f)).toFloat().coerceAtLeast(s(60f))
+                        drawBarcodeDecor(c, decorX, decorY, decorW, decorH, s0.noteText, s0.barcodeWidthScale, s0.barcodeGapMode, black)
                         val textY = qrY + qr.height + s(34f)
                         drawFittedText(c, s0.noteText, qrX, textY, mono, (rightEdge - qrX), Paint.Align.LEFT, 0.78f)
                     }
