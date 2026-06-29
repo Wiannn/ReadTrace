@@ -2583,24 +2583,25 @@ object AutoWallpaperGenerator {
                 val footerAreaTop = baseY + if (excerptMenu) s(16f) else s(18f)
                 val footerAreaH = (bottomSafeForFooter - footerAreaTop - s(8f)).coerceAtLeast(s(56f))
                 val qrSize = if (excerptMenu) {
-                    minOf(s(112f), footerAreaH * 0.78f).coerceAtLeast(s(64f)).toInt()
+                    val minQr = maxOf(72f, s(64f))
+                    val maxQr = minOf(168f, w * 0.13f, footerAreaH * 0.82f).coerceAtLeast(minQr)
+                    minOf(maxQr, footerAreaH * 0.72f).coerceAtLeast(minQr).toInt()
                 } else {
                     s(168f).toInt().coerceAtLeast(120)
                 }
                 val qr = buildQrBitmap(s0.noteText, qrSize)
                 if (qr != null) {
                     if (excerptMenu) {
-                        val gap = s(24f)
+                        val gap = maxOf(s(24f), w * 0.018f)
                         val maxGroupW = (rightEdge - leftMargin).coerceAtLeast(s(260f))
-                        val decorW = (maxGroupW - qr.width - gap)
-                            .coerceAtMost(w * 0.56f)
-                            .coerceAtLeast(s(160f))
+                        val availableDecorW = (maxGroupW - qr.width - gap).coerceAtLeast(w * 0.32f)
+                        val minDecorW = minOf(availableDecorW, maxOf(s(180f), w * 0.42f))
+                        val decorW = minOf(availableDecorW, w * 0.62f).coerceAtLeast(minDecorW)
                         val groupW = qr.width + gap + decorW
                         val groupX = ((w - groupW) / 2f).coerceAtLeast(leftMargin)
                         val qrY = footerAreaTop + ((footerAreaH - qr.height) / 2f).coerceAtLeast(0f)
-                        val decorH = (footerAreaH * 0.58f)
-                            .coerceAtMost(qr.height * 0.72f)
-                            .coerceAtLeast(s(34f))
+                        val decorH = minOf(footerAreaH * 0.68f, qr.height * 0.92f, 132f)
+                            .coerceAtLeast(maxOf(s(42f), minOf(footerAreaH * 0.44f, 58f)))
                         val decorX = groupX + qr.width + gap
                         val decorY = footerAreaTop + ((footerAreaH - decorH) / 2f).coerceAtLeast(0f)
                         c.drawBitmap(qr, groupX, qrY, null)
