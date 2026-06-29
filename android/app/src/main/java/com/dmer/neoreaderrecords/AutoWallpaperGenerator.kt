@@ -2584,8 +2584,8 @@ object AutoWallpaperGenerator {
                 val footerAreaH = (bottomSafeForFooter - footerAreaTop - s(8f)).coerceAtLeast(s(56f))
                 val qrSize = if (excerptMenu) {
                     val minQr = maxOf(72f, s(64f))
-                    val maxQr = minOf(168f, w * 0.13f, footerAreaH * 0.82f).coerceAtLeast(minQr)
-                    minOf(maxQr, footerAreaH * 0.72f).coerceAtLeast(minQr).toInt()
+                    val maxQr = minOf(184f, w * 0.145f, footerAreaH * 0.9f).coerceAtLeast(minQr)
+                    minOf(maxQr, footerAreaH * 0.82f).coerceAtLeast(minQr).toInt()
                 } else {
                     s(168f).toInt().coerceAtLeast(120)
                 }
@@ -2600,8 +2600,8 @@ object AutoWallpaperGenerator {
                         val groupW = qr.width + gap + decorW
                         val groupX = ((w - groupW) / 2f).coerceAtLeast(leftMargin)
                         val qrY = footerAreaTop + ((footerAreaH - qr.height) / 2f).coerceAtLeast(0f)
-                        val decorH = minOf(footerAreaH * 0.68f, qr.height * 0.92f, 132f)
-                            .coerceAtLeast(maxOf(s(42f), minOf(footerAreaH * 0.44f, 58f)))
+                        val decorH = minOf(footerAreaH * 0.78f, qr.height * 1.02f, 152f)
+                            .coerceAtLeast(maxOf(s(46f), minOf(footerAreaH * 0.52f, 68f)))
                         val decorX = groupX + qr.width + gap
                         val decorY = footerAreaTop + ((footerAreaH - decorH) / 2f).coerceAtLeast(0f)
                         c.drawBitmap(qr, groupX, qrY, null)
