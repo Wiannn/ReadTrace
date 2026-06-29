@@ -1666,14 +1666,9 @@ object AutoWallpaperGenerator {
     }
 
     private fun menuPriceText(durationMs: Long): String {
-        val minutes = (durationMs / 60_000L).coerceAtLeast(1L)
-        val price = when {
-            minutes < 10L -> 6L
-            minutes < 30L -> 12L
-            minutes < 60L -> 18L
-            else -> 28L + ((minutes - 60L) / 30L) * 6L
-        }.coerceAtMost(99L)
-        return "${price}元"
+        val minutes = ((durationMs + 59_999L) / 60_000L).coerceAtLeast(1L)
+        val price = ((minutes + 9L) / 10L).coerceIn(1L, 999L)
+        return "¥$price"
     }
 
     private fun weReadPeriodLabel(periodMode: String): String {
@@ -2384,7 +2379,7 @@ object AutoWallpaperGenerator {
 
         val excerptMenu = s0.statsTemplate == "EXCERPT_MENU"
         val bookLines = if (excerptMenu) {
-            books.sumOf { (80f + 42f + if (!it.latestExcerptText.isNullOrBlank()) 58f else 0f).toDouble() }.toFloat()
+            books.sumOf { (80f + if (!it.latestExcerptText.isNullOrBlank()) 96f else 0f).toDouble() }.toFloat()
         } else {
             books.size * (80f + (if (s0.showAuthor) 42f else 0f) + (if (s0.showProgressStatus) 50f else 0f))
         }
@@ -2407,6 +2402,7 @@ object AutoWallpaperGenerator {
         val serialNumberPaint = Paint(black).apply { textSize = s(s0.serialNumberSize); typeface = Typeface.create(bodyFace, Typeface.BOLD) }
         val text = Paint(black).apply { textSize = s(s0.receiptBodySize); typeface = bodyFace }
         val mono = Paint(black).apply { textSize = s((s0.receiptBodySize * 0.88f).coerceIn(16f, 56f)); typeface = bodyFace }
+        val excerptPaint = Paint(black).apply { textSize = s((s0.receiptBodySize * 0.98f).coerceIn(18f, 64f)); typeface = Typeface.create(bodyFace, Typeface.BOLD) }
         val line = Paint(black).apply { strokeWidth = s(3f) }
 
         val leftMargin = s(60f)
@@ -2420,8 +2416,8 @@ object AutoWallpaperGenerator {
         val titleX = s(260f)
         val qtyX = w - s(260f)
         val unitX = w - s(140f)
-        val chefX = w - s(280f)
-        val priceX = w - s(110f)
+        val chefX = w - s(245f)
+        val priceX = w - s(85f)
         val titleColumnMaxWidth = if (excerptMenu) {
             (chefX - titleX - s(28f)).coerceAtLeast(s(160f))
         } else {
@@ -2448,8 +2444,8 @@ object AutoWallpaperGenerator {
         y += s(48f)
         c.drawText("品类", noX, y, text)
         if (excerptMenu) {
-            drawFittedText(c, "厨师", chefX, y, text, s(130f), Paint.Align.CENTER, 0.8f)
-            drawFittedText(c, "价格", priceX, y, text, s(110f), Paint.Align.CENTER, 0.8f)
+            drawFittedText(c, "主厨", chefX, y, text, s(190f), Paint.Align.CENTER, 0.8f)
+            drawFittedText(c, "价格", priceX, y, text, s(90f), Paint.Align.CENTER, 0.8f)
         } else {
             drawFittedText(c, "数量", qtyX, y, text, s(84f), Paint.Align.CENTER, 0.8f)
             drawFittedText(c, "单位", unitX, y, text, s(84f), Paint.Align.CENTER, 0.8f)
@@ -2462,18 +2458,12 @@ object AutoWallpaperGenerator {
             c.drawText("NO.${(idx + 1).toString().padStart(2, '0')}", noX, y, h1)
             drawFittedText(c, b.title, titleX, y, h1, titleColumnMaxWidth, Paint.Align.LEFT, 0.68f)
             if (excerptMenu) {
-                drawFittedText(c, b.author ?: "未知", chefX, y, h1, s(150f), Paint.Align.CENTER, 0.68f)
-                drawFittedText(c, b.menuPriceText ?: "6元", priceX, y, h1, s(110f), Paint.Align.CENTER, 0.8f)
-                y += s(42f)
-                val meta = listOfNotNull(
-                    b.durationText?.takeIf { it.isNotBlank() }?.let { "时长:$it" },
-                    (b.progressText ?: formatProgress(b.progress, s0.progressMode)).takeIf { it.isNotBlank() }?.let { "进度:$it" }
-                ).joinToString("  ")
-                drawFittedText(c, meta, titleX, y, mono, (rightEdge - titleX).coerceAtLeast(s(180f)), Paint.Align.LEFT, 0.78f)
+                drawFittedText(c, b.author ?: "未知", chefX, y, h1, s(215f), Paint.Align.CENTER, 0.62f)
+                drawFittedText(c, b.menuPriceText ?: "¥1", priceX, y, h1, s(90f), Paint.Align.CENTER, 0.72f)
                 val excerpt = b.latestExcerptText?.trim().orEmpty()
                 if (excerpt.isNotBlank()) {
                     y += s(58f)
-                    drawFittedText(c, "摘：$excerpt", titleX, y, mono, (rightEdge - titleX).coerceAtLeast(s(180f)), Paint.Align.LEFT, 0.72f)
+                    y = drawTwoLineText(c, "摘：$excerpt", titleX, y, excerptPaint, (rightEdge - titleX).coerceAtLeast(s(180f)), s(42f))
                 }
             } else {
                 drawFittedText(c, "1", qtyX, y, h1, s(84f), Paint.Align.CENTER, 0.8f)
@@ -2495,9 +2485,14 @@ object AutoWallpaperGenerator {
         y += s(30f)
         c.drawLine(s(40f), y, w - s(40f), y, line)
         y += s(60f)
-        val avgDiv = stats.points.size.coerceAtLeast(1)
-        drawFittedText(c, "日均: ${String.format(Locale.US, "%.0f分钟", stats.totalMs / avgDiv.toDouble() / 60000.0)}", leftMargin, y, h1, (w * 0.38f), Paint.Align.LEFT, 0.72f)
-        drawFittedText(c, "本期合计: ${formatDuration(stats.totalMs, s0.timeUnit)}", rightEdge, y, h1, (w * 0.54f), Paint.Align.RIGHT, 0.72f)
+        if (excerptMenu) {
+            drawFittedText(c, "价格公式: 向上取整(阅读分钟÷10)", leftMargin, y, h1, (w * 0.56f), Paint.Align.LEFT, 0.58f)
+            drawFittedText(c, "最低¥1 · 封顶¥999", rightEdge, y, h1, (w * 0.38f), Paint.Align.RIGHT, 0.62f)
+        } else {
+            val avgDiv = stats.points.size.coerceAtLeast(1)
+            drawFittedText(c, "日均: ${String.format(Locale.US, "%.0f分钟", stats.totalMs / avgDiv.toDouble() / 60000.0)}", leftMargin, y, h1, (w * 0.38f), Paint.Align.LEFT, 0.72f)
+            drawFittedText(c, "本期合计: ${formatDuration(stats.totalMs, s0.timeUnit)}", rightEdge, y, h1, (w * 0.54f), Paint.Align.RIGHT, 0.72f)
+        }
 
         y += s(50f)
         val footerReserved = if (!hasFooter) 0f else if (s0.footerMode == "BARCODE") s(260f) else s(120f)
@@ -2602,6 +2597,51 @@ object AutoWallpaperGenerator {
         canvas.drawText(fitted, x, y, paint)
         paint.textSize = originalTextSize
         paint.textAlign = originalAlign
+    }
+
+    private fun drawTwoLineText(
+        canvas: Canvas,
+        raw: String,
+        x: Float,
+        y: Float,
+        paint: Paint,
+        maxWidth: Float,
+        lineHeight: Float
+    ): Float {
+        if (raw.isBlank() || maxWidth <= 0f) return y
+        val originalAlign = paint.textAlign
+        paint.textAlign = Paint.Align.LEFT
+        val first = takePrefixWithinWidth(raw, paint, maxWidth)
+        canvas.drawText(first.line, x, y, paint)
+        var lastY = y
+        val rest = first.rest.trimStart()
+        if (rest.isNotBlank()) {
+            lastY += lineHeight
+            canvas.drawText(ellipsizeToWidth(rest, paint, maxWidth), x, lastY, paint)
+        }
+        paint.textAlign = originalAlign
+        return lastY
+    }
+
+    private data class TextSplit(val line: String, val rest: String)
+
+    private fun takePrefixWithinWidth(raw: String, paint: Paint, maxWidth: Float): TextSplit {
+        if (raw.isEmpty() || paint.measureText(raw) <= maxWidth) return TextSplit(raw, "")
+        var lo = 1
+        var hi = raw.length
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (paint.measureText(raw.take(mid)) <= maxWidth) {
+                lo = mid
+            } else {
+                hi = mid - 1
+            }
+        }
+        val splitEnd = raw.take(lo).lastIndexOfAny(charArrayOf(' ', '，', '。', '、', '；', '：', ',', '.', ';', ':'))
+            .takeIf { it >= 4 }
+            ?.let { it + 1 }
+            ?: lo
+        return TextSplit(raw.take(splitEnd).trimEnd(), raw.drop(splitEnd).trimStart())
     }
 
     private fun ellipsizeToWidth(raw: String, paint: Paint, maxWidth: Float): String {
