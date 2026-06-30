@@ -1236,9 +1236,10 @@ object AutoWallpaperGenerator {
             context,
             key,
             bookMap.values
-            .sortedByDescending { it.readSeconds }
-            .take(s.topN)
-            .map { toWeReadBookItem(context, key, it) to it.readSeconds * 1000L },
+                .sortedByDescending { it.readSeconds }
+                .map { toWeReadBookItem(context, key, it) to it.readSeconds * 1000L }
+                .filter { matchesReadingFilter(it.first, s) }
+                .take(s.topN),
             s,
             fetchWeReadExcerpt = true
         )
@@ -1288,9 +1289,11 @@ object AutoWallpaperGenerator {
         val chart = bucketize(localEvents + weReadEvents, range.first, range.second, chooseBucketMode(s, range.first, range.second))
         val localBooks = queryTopBooksByDuration(context, range.first, range.second, s)
             .map { it.first to it.second }
-        val weReadBooks = weReadBookScores.values.map { (book, scoreMs) ->
-            toWeReadBookItem(context, key, book).copy(durationText = formatDuration(scoreMs, s.timeUnit), menuPriceText = menuPriceText(scoreMs)) to scoreMs
-        }
+        val weReadBooks = weReadBookScores.values
+            .map { (book, scoreMs) ->
+                toWeReadBookItem(context, key, book).copy(durationText = formatDuration(scoreMs, s.timeUnit), menuPriceText = menuPriceText(scoreMs)) to scoreMs
+            }
+            .filter { matchesReadingFilter(it.first, s) }
         val mergedBooks = enrichExcerptMenuBooks(context, key, mergeScoredBooksWithScores(localBooks + weReadBooks, s.topN, s.timeUnit), s, fetchWeReadExcerpt = true)
         val note = buildString {
             append("本地+微信，图表按时间相加，书单按阅读时长合并排序")
@@ -1526,6 +1529,15 @@ object AutoWallpaperGenerator {
             progressText = progressText,
             durationText = WeReadClient.formatSeconds(durationSeconds)
         )
+    }
+
+    private fun matchesReadingFilter(book: BookItem, s: AutoSettings): Boolean {
+        if (!s.includeUnread && book.status == 0) return false
+        return when (s.readingFilterMode) {
+            "READING_ONLY" -> book.status == 1
+            "FINISHED_ONLY" -> book.status == 2
+            else -> true
+        }
     }
 
     private fun mergeScoredBooks(items: List<Pair<BookItem, Long>>, limit: Int, unit: String): List<BookItem> {
