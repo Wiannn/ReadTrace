@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val FONT_ENTRY_SEP = "@@"
         private const val SPONSOR_QR_URL = "https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png"
+        private const val XHS_PROFILE_URL = "https://xhslink.com/m/1QDye14ktkf"
     }
 
     private class SimpleItemSelectedListener(val onChange: () -> Unit) : AdapterView.OnItemSelectedListener {
@@ -1339,6 +1340,21 @@ class MainActivity : ComponentActivity() {
         addHint("说明：App 只检查并跳转 GitHub Release 页面，不会自动下载或安装 APK。")
         updateReleaseStatusFromCache()
 
+        addSectionTitle("联系开发者", "反馈问题、关注更新、请喝奶茶")
+        val contactButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 16)
+        }
+        contactButtons.addView(Button(this).apply {
+            text = "关注小红书 (๑•̀ㅂ•́)و✧"
+            setOnClickListener { openXhsProfile() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0, 0, 12, 0) })
+        contactButtons.addView(Button(this).apply {
+            text = "请喝奶茶 🧋 (｡･ω･｡)ﾉ♡"
+            setOnClickListener { showSponsorQrDialog() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(contactButtons)
+
         statusText = TextView(this).apply {
             text = "设置后点击按钮生成。"
             textSize = 16f
@@ -1346,10 +1362,6 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 16, 0, 0)
             root.addView(this)
         }
-        root.addView(Button(this).apply {
-            text = "请喝奶茶 🧋 (｡･ω･｡)ﾉ♡"
-            setOnClickListener { showSponsorQrDialog() }
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 20, 0, 8) })
 
         fun updateConditionalVisibility() {
             val customPeriod = periodGroup.checkedRadioButtonId == 4005
@@ -2106,6 +2118,19 @@ class MainActivity : ComponentActivity() {
             if (::statusText.isInitialized) {
                 statusText.text = "无法打开收款码链接：${it.javaClass.simpleName}"
             }
+        }
+    }
+
+    private fun openXhsProfile() {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(XHS_PROFILE_URL)))
+        }.onSuccess {
+            AutoRefreshLog.i(this, "xhs profile opened")
+        }.onFailure {
+            if (::statusText.isInitialized) {
+                statusText.text = "无法打开小红书主页：${it.javaClass.simpleName}\n$XHS_PROFILE_URL"
+            }
+            AutoRefreshLog.e(this, "open xhs profile failed", it)
         }
     }
 
