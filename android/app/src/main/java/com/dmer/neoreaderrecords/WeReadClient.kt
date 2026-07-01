@@ -20,7 +20,7 @@ object WeReadClient {
     private const val KEY_LAST_COVER_PATH = "weread_last_cover_path"
     private const val KEY_LAST_COVER_BYTES = "weread_last_cover_bytes"
     private const val API_GATEWAY = "https://i.weread.qq.com/api/agent/gateway"
-    private const val SKILL_VERSION = "1.0.3"
+    private const val SKILL_VERSION = "1.0.4"
 
     data class State(
         val maskedKey: String,
