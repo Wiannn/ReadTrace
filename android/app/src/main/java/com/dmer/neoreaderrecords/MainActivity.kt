@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -45,6 +46,8 @@ import com.google.zxing.common.BitMatrix
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FileWriter
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -54,6 +57,7 @@ import java.util.TimeZone
 class MainActivity : ComponentActivity() {
     companion object {
         private const val FONT_ENTRY_SEP = "@@"
+        private const val SPONSOR_QR_URL = "https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png"
     }
 
     private class SimpleItemSelectedListener(val onChange: () -> Unit) : AdapterView.OnItemSelectedListener {
@@ -1342,6 +1346,10 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 16, 0, 0)
             root.addView(this)
         }
+        root.addView(Button(this).apply {
+            text = "请喝奶茶 🧋 (｡･ω･｡)ﾉ♡"
+            setOnClickListener { showSponsorQrDialog() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 20, 0, 8) })
 
         fun updateConditionalVisibility() {
             val customPeriod = periodGroup.checkedRadioButtonId == 4005
@@ -2011,6 +2019,92 @@ class MainActivity : ComponentActivity() {
         }.onFailure {
             if (::updateStatusText.isInitialized) {
                 updateStatusText.text = "${updateStatusText.text}\n无法打开链接：${it.javaClass.simpleName}"
+            }
+        }
+    }
+
+    private fun showSponsorQrDialog() {
+        val density = resources.displayMetrics.density
+        fun dp(value: Int): Int = (value * density + 0.5f).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(8))
+        }
+        TextView(this).apply {
+            text = "如果阅迹壁纸刚好帮到了你，也欢迎请我喝杯奶茶 🧋\n(づ｡◕‿‿◕｡)づ"
+            textSize = 15f
+            setTextColor(Color.BLACK)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(12))
+            content.addView(this)
+        }
+        val qrImage = ImageView(this).apply {
+            visibility = View.GONE
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            content.addView(
+                this,
+                LinearLayout.LayoutParams(dp(240), dp(240)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                }
+            )
+        }
+        val state = TextView(this).apply {
+            text = "收款码加载中..."
+            textSize = 13f
+            setTextColor(Color.DKGRAY)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(10), 0, 0)
+            content.addView(this)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("请喝奶茶 (｡･ω･｡)ﾉ♡")
+            .setView(content)
+            .setNegativeButton("打开链接") { _, _ -> openSponsorQrLink() }
+            .setPositiveButton("关闭", null)
+            .show()
+        AutoRefreshLog.i(this, "sponsor qr dialog opened")
+        Thread {
+            val result = runCatching { loadSponsorQrBitmap() }
+            runOnUiThread {
+                if (!dialog.isShowing) return@runOnUiThread
+                result.onSuccess { bmp ->
+                    qrImage.setImageBitmap(bmp)
+                    qrImage.visibility = View.VISIBLE
+                    state.text = "支付宝扫一扫支持一下 ( •̀ ω •́ )✧"
+                }.onFailure {
+                    qrImage.visibility = View.GONE
+                    state.text = "收款码加载失败，可点击“打开链接”。\n$SPONSOR_QR_URL"
+                    AutoRefreshLog.e(this, "sponsor qr load failed", it)
+                }
+            }
+        }.start()
+    }
+
+    private fun loadSponsorQrBitmap(): Bitmap {
+        val conn = (URL(SPONSOR_QR_URL).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 8000
+            readTimeout = 12000
+            instanceFollowRedirects = true
+            requestMethod = "GET"
+        }
+        return try {
+            val code = conn.responseCode
+            if (code !in 200..299) error("HTTP $code")
+            conn.inputStream.use { input ->
+                BitmapFactory.decodeStream(input) ?: error("decode failed")
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun openSponsorQrLink() {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SPONSOR_QR_URL)))
+        }.onFailure {
+            if (::statusText.isInitialized) {
+                statusText.text = "无法打开收款码链接：${it.javaClass.simpleName}"
             }
         }
     }
