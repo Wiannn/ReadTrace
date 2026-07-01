@@ -12,9 +12,12 @@
 
 ## 赞助支持
 
-如果这个工具对你有帮助，可以通过支付宝赞助支持后续适配和维护：
+如果阅迹壁纸刚好帮到了你，也欢迎请我喝杯奶茶 🧋  
+感谢支持，后续会继续慢慢适配更多设备和使用场景。
 
-[![支付宝赞助码](https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png)](https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png)
+<a href="https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png">
+  <img src="https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png" alt="支付宝赞助码" width="240" />
+</a>
 
 ## 适用设备
 
