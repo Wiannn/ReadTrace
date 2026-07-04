@@ -10,15 +10,6 @@
 
 项目只通过 GitHub Release 分发，不上架应用商店。
 
-## 赞助支持
-
-如果阅迹壁纸刚好帮到了你，也欢迎请我喝杯奶茶 🧋 (｡･ω･｡)ﾉ♡  
-感谢支持，后续会继续慢慢适配更多设备和使用场景 ฅ^•ﻌ•^ฅ
-
-<a href="https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png">
-  <img src="https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png" alt="支付宝赞助码" width="240" />
-</a>
-
 ## 适用设备
 
 应用主要为文石 BOOX 设备设计，测试设备为 Leaf 5。只要设备能通过 NeoReader 写入阅读记录，理论上都可以尝试使用。
