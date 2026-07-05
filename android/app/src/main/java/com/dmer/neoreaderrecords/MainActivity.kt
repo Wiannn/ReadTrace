@@ -39,8 +39,15 @@ import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
+<<<<<<< HEAD
 
 
+=======
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.common.BitMatrix
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FileWriter
@@ -55,6 +62,11 @@ import java.util.TimeZone
 class MainActivity : ComponentActivity() {
     companion object {
         private const val FONT_ENTRY_SEP = "@@"
+<<<<<<< HEAD
+=======
+        private const val SPONSOR_QR_URL = "https://dmer.work:15060/images/2026/07/01/IMG_7329_neutral.JPG.png"
+        private const val XHS_PROFILE_URL = "https://xhslink.com/m/1QDye14ktkf"
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     }
 
     private class SimpleItemSelectedListener(val onChange: () -> Unit) : AdapterView.OnItemSelectedListener {
@@ -65,6 +77,7 @@ class MainActivity : ComponentActivity() {
     private val metadataUri = Uri.parse("content://com.onyx.content.database.ContentProvider/Metadata")
     private val statsUri = Uri.parse("content://com.onyx.kreader.statistics.provider/OnyxStatisticsModel")
 
+<<<<<<< HEAD
     private lateinit var topNInput: EditText
     private lateinit var titleInput: EditText
     private lateinit var titleSizeInput: EditText
@@ -80,13 +93,59 @@ class MainActivity : ComponentActivity() {
     private lateinit var booxDevicePresetGroup: RadioGroup
     private lateinit var coverFitModeGroup: RadioGroup
 
+=======
+    private lateinit var includeUnreadCheck: CheckBox
+    private lateinit var showChartCheck: CheckBox
+    private lateinit var showProgressStatusCheck: CheckBox
+    private lateinit var showAuthorCheck: CheckBox
+    private lateinit var showBookDurationCheck: CheckBox
+    private lateinit var minDurationInput: EditText
+    private lateinit var topNInput: EditText
+    private lateinit var titleInput: EditText
+    private lateinit var titleSizeInput: EditText
+    private lateinit var bodySizeInput: EditText
+    private lateinit var serialNumberSizeInput: EditText
+    private lateinit var serialCustomInput: EditText
+    private lateinit var customWallpaperWidthInput: EditText
+    private lateinit var customWallpaperHeightInput: EditText
+    private lateinit var noteInput: EditText
+    private lateinit var weekStartText: TextView
+    private lateinit var weekEndText: TextView
+    private lateinit var sourceGroup: RadioGroup
+    private lateinit var periodGroup: RadioGroup
+    private lateinit var progressModeGroup: RadioGroup
+    private lateinit var readingFilterGroup: RadioGroup
+    private lateinit var timeUnitGroup: RadioGroup
+    private lateinit var wallpaperModeGroup: RadioGroup
+    private lateinit var statsTemplateGroup: RadioGroup
+    private lateinit var calendarStackOrderGroup: RadioGroup
+    private lateinit var booxDevicePresetGroup: RadioGroup
+    private lateinit var coverFitModeGroup: RadioGroup
+    private lateinit var serialModeGroup: RadioGroup
+    private lateinit var footerModeGroup: RadioGroup
+    private lateinit var barcodeWidthGroup: RadioGroup
+    private lateinit var barcodeGapGroup: RadioGroup
+    private lateinit var chartStyleGroup: RadioGroup
+    private lateinit var yAxisModeGroup: RadioGroup
+    private lateinit var showPeakLabelCheck: CheckBox
+    private lateinit var yAxisMaxInput: EditText
+    private lateinit var readingDataStoreCheck: CheckBox
+    private lateinit var autoRefreshCheck: CheckBox
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     private lateinit var autoModeGroup: RadioGroup
     private lateinit var autoDailyTimeInput: EditText
     private lateinit var autoMinIntervalInput: EditText
     private lateinit var autoModeHintText: TextView
     private lateinit var autoStateText: TextView
+<<<<<<< HEAD
     private lateinit var wereadApiKeyInput: EditText
     
+=======
+    private lateinit var updateStatusText: TextView
+    private lateinit var wereadApiKeyInput: EditText
+    private lateinit var wereadStatsModeGroup: RadioGroup
+    private lateinit var wereadStatusText: TextView
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     private lateinit var pickFontDirBtn: Button
     private lateinit var titleFontSpinner: Spinner
     private lateinit var bodyFontSpinner: Spinner
@@ -109,16 +168,30 @@ class MainActivity : ComponentActivity() {
     private var selectedWeekEndYmd: String = ""
     private val systemFonts: MutableList<String> = mutableListOf()
     private var fontScanReport: String = ""
+<<<<<<< HEAD
+=======
+    private var barcodeDebugReport: String = ""
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     private var fontPermissionDebug: String = ""
     private var metadataDebugReport: String = ""
     private var metadataRowsDebugReport: String = ""
     private var localCalendarProbeReport: String = ""
     private var uiDebugReport: String = ""
+<<<<<<< HEAD
     private var isTestingWeRead: Boolean = false
     private var lastWeReadWallpaperDebug: String = ""
     private val debugLogName = "neoreader_debug_log.txt"
     private var selectedFontDirUri: String? = null
     private var selectedStickerPath: String? = null
+=======
+    private var isCheckingUpdates: Boolean = false
+    private var isTestingWeRead: Boolean = false
+    private var lastWeReadStatsDebug: String = ""
+    private var lastWeReadCoverDebug: String = ""
+    private var lastWeReadWallpaperDebug: String = ""
+    private val debugLogName = "neoreader_debug_log.txt"
+    private var selectedFontDirUri: String? = null
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
 
     private val pickFontTreeLauncher = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -137,6 +210,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+<<<<<<< HEAD
     private val pickStickerImageLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             try {
@@ -161,6 +235,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+=======
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     data class BookItem(val title: String, val author: String?, val progress: String?, val status: Int, val path: String?)
     private data class CalendarMetaBook(
         val path: String,
@@ -181,17 +257,32 @@ class MainActivity : ComponentActivity() {
     )
 
     enum class DataSourceMode { DURATION, PATH_SESSION, METADATA_ACCESS, WEREAD, MIXED }
+<<<<<<< HEAD
     enum class PeriodMode { RECENT, THIS_WEEK, THIS_MONTH }
 
     data class Settings(
         val includeUnread: Boolean,
         val showProgressStatus: Boolean,
 
+=======
+    enum class PeriodMode { TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, THIS_MONTH, LAST_7_DAYS, LAST_30_DAYS, CUSTOM }
+    enum class ReadingFilterMode { ALL, READING_ONLY, FINISHED_ONLY }
+    enum class ChartStyleMode { LINE, BAR }
+    enum class YAxisMode { AUTO, FIXED }
+
+    data class Settings(
+        val includeUnread: Boolean,
+        val showChart: Boolean,
+        val showProgressStatus: Boolean,
+        val showAuthor: Boolean,
+        val showBookDuration: Boolean,
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val minDurationMinutes: Int,
         val topN: Int,
         val weekStartYmd: String,
         val weekEndYmd: String,
         val periodMode: PeriodMode,
+<<<<<<< HEAD
         val sourceMode: DataSourceMode,
         val wallpaperMode: String,
 
@@ -208,6 +299,35 @@ class MainActivity : ComponentActivity() {
         val titleFont: String,
         val bodyFont: String,
         val stickerImagePath: String?
+=======
+        val readingFilterMode: ReadingFilterMode,
+        val sourceMode: DataSourceMode,
+        val wallpaperMode: String,
+        val statsTemplate: String,
+        val calendarStackOrder: String,
+        val coverFitMode: String,
+        val progressMode: String,
+        val timeUnit: String,
+        val receiptTitle: String,
+        val receiptTitleSize: Float,
+        val receiptBodySize: Float,
+        val serialNumberMode: String,
+        val serialNumberCustom: String,
+        val serialNumberSize: Float,
+        val booxDevicePreset: String,
+        val customWallpaperWidth: Int,
+        val customWallpaperHeight: Int,
+        val footerMode: String,
+        val barcodeWidthScale: Float,
+        val barcodeGapMode: String,
+        val noteText: String,
+        val chartStyleMode: ChartStyleMode,
+        val showPeakLabel: Boolean,
+        val yAxisMode: YAxisMode,
+        val yAxisFixedMaxMinutes: Int,
+        val titleFont: String,
+        val bodyFont: String
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -238,6 +358,11 @@ class MainActivity : ComponentActivity() {
             validateFontTreePermission()
             reloadFontsFromSources()
             updateAutoRuntimeState()
+<<<<<<< HEAD
+=======
+            updateReleaseStatusFromCache()
+            checkForUpdatesIfNeeded(force = false)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
             writeDebugLog("onResume_rescan")
         }
     }
@@ -310,7 +435,10 @@ class MainActivity : ComponentActivity() {
         isInitializingUi = true
         val prefs = getSharedPreferences("wallpaper_settings", Context.MODE_PRIVATE)
         selectedFontDirUri = prefs.getString("font_tree_uri", null)
+<<<<<<< HEAD
         selectedStickerPath = prefs.getString("sticker_image_path", null)
+=======
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         systemFonts.clear()
         systemFonts.addAll(loadSystemFonts())
         selectedWeekStartYmd = prefs.getString("week_start", currentWeekStartYmd()) ?: currentWeekStartYmd()
@@ -414,6 +542,10 @@ class MainActivity : ComponentActivity() {
         showSettingsPage()
         isInitializingUi = false
         applySettingsPreview()
+<<<<<<< HEAD
+=======
+        checkForUpdatesIfNeeded(force = false)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         writeDebugLog("setupUi_done")
         startReadingStoreBootstrapIfNeeded()
     }
@@ -435,10 +567,24 @@ class MainActivity : ComponentActivity() {
                     if (ok) prefs.edit().putBoolean(key, true).apply()
                 }
             }
+<<<<<<< HEAD
             val incrementalOk = AutoWallpaperGenerator.syncRecentNeoReadingStore(applicationContext, "app_start")
             val weReadOk = WeReadReadingSync.syncCurrentMonth(applicationContext, "app_start")
             appendUiDebug(
                 "readingStoreMaintenance finished bootstrapOk=$bootstrapOk incrementalOk=$incrementalOk weReadOk=$weReadOk sourceMode=WEREAD wallpaperMode=STATS"
+=======
+            val wallpaperMode = prefs.getString("wallpaper_mode", "STATS") ?: "STATS"
+            val incrementalOk = wallpaperMode == "CALENDAR" ||
+                AutoWallpaperGenerator.syncRecentNeoReadingStore(applicationContext, "app_start")
+            val sourceMode = prefs.getString("source_mode", "DURATION") ?: "DURATION"
+            val weReadOk = if (sourceMode == "WEREAD" || sourceMode == "MIXED") {
+                WeReadReadingSync.syncCurrentMonth(applicationContext, "app_start")
+            } else {
+                true
+            }
+            appendUiDebug(
+                "readingStoreMaintenance finished bootstrapOk=$bootstrapOk incrementalOk=$incrementalOk weReadOk=$weReadOk sourceMode=$sourceMode wallpaperMode=$wallpaperMode"
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
             )
         }.apply {
             name = "reading-store-bootstrap"
@@ -940,11 +1086,73 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+<<<<<<< HEAD
         val periodOptions = listOf(4000 to "最近", 4001 to "本周", 4007 to "本月")
         val periodNames = listOf(PeriodMode.RECENT.name, PeriodMode.THIS_WEEK.name, PeriodMode.THIS_MONTH.name)
         val savedPeriod = prefs.getString("period_mode", PeriodMode.THIS_WEEK.name) ?: PeriodMode.THIS_WEEK.name
         periodGroup = makeRadioGroup(periodOptions, selectedId(savedPeriod, 4001, periodOptions, periodNames))
 
+=======
+        root.addView(TextView(this).apply {
+            text = "阅读壁纸设置"
+            textSize = 28f
+            setTextColor(Color.BLACK)
+            setTypeface(Typeface.DEFAULT_BOLD)
+            setPadding(0, 0, 0, 8)
+        })
+        root.addView(TextView(this).apply {
+            text = "提示：少数情况下，锁屏时系统可能还没读取到刚生成的壁纸，通常下一次锁屏会显示最新结果。"
+            textSize = 14f
+            setTextColor(Color.DKGRAY)
+            setPadding(0, 0, 0, 40)
+        })
+
+        val periodOptions = listOf(4000 to "当天\n只看今天", 4006 to "昨天\n只看昨日", 4001 to "本周\n周视图", 4002 to "上周\n回看上周", 4007 to "本月\n自然月历", 4003 to "最近7天\n滚动7天", 4004 to "最近30天\n月度概览", 4005 to "自定义起止\n手动选日期")
+        val periodNames = listOf(PeriodMode.TODAY.name, PeriodMode.YESTERDAY.name, PeriodMode.THIS_WEEK.name, PeriodMode.LAST_WEEK.name, PeriodMode.THIS_MONTH.name, PeriodMode.LAST_7_DAYS.name, PeriodMode.LAST_30_DAYS.name, PeriodMode.CUSTOM.name)
+        val savedPeriod = prefs.getString("period_mode", PeriodMode.THIS_WEEK.name) ?: PeriodMode.THIS_WEEK.name
+        periodGroup = makeRadioGroup(periodOptions, selectedId(savedPeriod, 4001, periodOptions, periodNames))
+
+        val sourceOptions = listOf(
+            1001 to "Neo 阅读器\n读取文石本地阅读记录",
+            1004 to "微信读书\n联网读取微信统计与封面",
+            1005 to "混合来源\n合并本地和微信数据"
+        )
+        val sourceNames = listOf(DataSourceMode.DURATION.name, DataSourceMode.WEREAD.name, DataSourceMode.MIXED.name)
+        sourceGroup = makeRadioGroup(sourceOptions, selectedId(prefs.getString("source_mode", DataSourceMode.DURATION.name) ?: DataSourceMode.DURATION.name, 1001, sourceOptions, sourceNames))
+
+        val wallpaperOptions = listOf(
+            1201 to "统计壁纸\n生成阅读账单图片",
+            1202 to "当前阅读封面\n使用当前来源的最近封面",
+            1203 to "自动封面优先\n有封面用封面，否则用账单",
+            1204 to "月历封面墙\n按天展示所选来源数据"
+        )
+        val wallpaperNames = listOf("STATS", "COVER", "AUTO_COVER", "CALENDAR")
+        wallpaperModeGroup = makeRadioGroup(wallpaperOptions, selectedId(prefs.getString("wallpaper_mode", "STATS") ?: "STATS", 1201, wallpaperOptions, wallpaperNames))
+
+        val statsTemplateOptions = listOf(
+            1241 to "阅读账单\n显示时长、进度和图表",
+            1242 to "摘录菜单\n显示最新划线/想法和阅读价格"
+        )
+        val statsTemplateNames = listOf("RECEIPT", "EXCERPT_MENU")
+        statsTemplateGroup = makeRadioGroup(statsTemplateOptions, selectedId(prefs.getString("stats_template", "RECEIPT") ?: "RECEIPT", 1241, statsTemplateOptions, statsTemplateNames), RadioGroup.VERTICAL)
+
+        val calendarStackOrderOptions = listOf(
+            1221 to "阅读最长在最上\n突出当天主要阅读",
+            1222 to "阅读最短在最上\n突出短时翻阅书籍",
+            1223 to "最近打开在最上\n突出当天最后阅读"
+        )
+        val calendarStackOrderNames = listOf("LONGEST_TOP", "SHORTEST_TOP", "LATEST_TOP")
+        calendarStackOrderGroup = makeRadioGroup(
+            calendarStackOrderOptions,
+            selectedId(
+                prefs.getString("calendar_stack_order", "LONGEST_TOP") ?: "LONGEST_TOP",
+                1221,
+                calendarStackOrderOptions,
+                calendarStackOrderNames
+            )
+        )
+
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val matchedBooxPreset = detectBooxDevicePresetOrNull()
         val detectedBooxPreset = matchedBooxPreset ?: BooxDevicePresets.DEFAULT_KEY
         val booxDevicePresetOptions = listOf(1301 to "自定义分辨率\n手动输入宽度和高度") + BooxDevicePresets.all.mapIndexed { index, preset ->
@@ -973,6 +1181,7 @@ class MainActivity : ComponentActivity() {
         val coverFitOptions = listOf(1211 to "完整显示\n不裁掉封面", 1212 to "铺满裁切\n铺满屏幕边缘")
         val coverFitNames = listOf("FIT", "CROP")
         coverFitModeGroup = makeRadioGroup(coverFitOptions, selectedId(prefs.getString("cover_fit_mode", "FIT") ?: "FIT", 1211, coverFitOptions, coverFitNames), RadioGroup.HORIZONTAL)
+<<<<<<< HEAD
         
         topNInput = makeInput(prefs.getInt("top_n", 5).coerceIn(1, 5).toString())
         titleInput = makeInput(prefs.getString("receipt_title", "Recipe") ?: "Recipe")
@@ -1009,6 +1218,151 @@ class MainActivity : ComponentActivity() {
             pickFontTreeLauncher.launch(null)
         }.first
         //选择存储/Fonts 后，可在标题字体和正文字体里使用里面的 ttf/otf 字体
+=======
+
+        val timeUnitOptions = listOf(2001 to "小时\n自动显示x小时y分钟", 2002 to "分钟\n全部换算成分钟")
+        val timeUnitNames = listOf("HOUR", "MINUTE")
+        timeUnitGroup = makeRadioGroup(timeUnitOptions, selectedId(prefs.getString("time_unit", "HOUR") ?: "HOUR", 2001, timeUnitOptions, timeUnitNames), RadioGroup.HORIZONTAL)
+
+        val readingFilterOptions = listOf(6001 to "全部\n不按状态过滤", 6002 to "仅在读\n只显示没读完", 6003 to "仅已读完\n只显示已完成")
+        val readingFilterNames = listOf(ReadingFilterMode.ALL.name, ReadingFilterMode.READING_ONLY.name, ReadingFilterMode.FINISHED_ONLY.name)
+        readingFilterGroup = makeRadioGroup(readingFilterOptions, selectedId(prefs.getString("reading_filter_mode", ReadingFilterMode.ALL.name) ?: ReadingFilterMode.ALL.name, 6001, readingFilterOptions, readingFilterNames), RadioGroup.HORIZONTAL)
+
+        val progressOptions = listOf(6101 to "页数\n例如32/198", 6102 to "百分比\n例如16%")
+        val progressNames = listOf("PAGES", "PERCENT")
+        progressModeGroup = makeRadioGroup(progressOptions, selectedId(prefs.getString("progress_mode", "PAGES") ?: "PAGES", 6101, progressOptions, progressNames), RadioGroup.HORIZONTAL)
+
+        val serialOptions = listOf(2011 to "月日\n自动用当前日期", 2012 to "随机\n每次生成变化", 2013 to "自定义\n手动固定数字")
+        val serialNames = listOf("DATE", "RANDOM", "CUSTOM")
+        serialModeGroup = makeRadioGroup(serialOptions, selectedId(prefs.getString("serial_number_mode", "DATE") ?: "DATE", 2011, serialOptions, serialNames), RadioGroup.HORIZONTAL)
+
+        val footerOptions = listOf(3001 to "不显示\n底部留白更干净", 3002 to "只显示备注\n显示一句自定义文字", 3003 to "条码 + 备注\n增加票据装饰感")
+        val footerNames = listOf("NONE", "NOTE", "BARCODE")
+        footerModeGroup = makeRadioGroup(footerOptions, selectedId(prefs.getString("footer_mode", "NONE") ?: "NONE", 3001, footerOptions, footerNames))
+
+        val barcodeWidthOptions = listOf(3101 to "细(0.8x)\n更轻", 3102 to "标准(1.0x)\n默认", 3103 to "粗(1.2x)\n更醒目")
+        val savedBarcodeWidth = when (prefs.getFloat("barcode_width_scale", 1.0f)) {
+            0.8f -> 3101
+            1.2f -> 3103
+            else -> 3102
+        }
+        barcodeWidthGroup = makeRadioGroup(barcodeWidthOptions, savedBarcodeWidth, RadioGroup.HORIZONTAL)
+
+        val barcodeGapOptions = listOf(3111 to "紧凑\n线条更密", 3112 to "标准\n推荐", 3113 to "疏松\n留白更多")
+        val barcodeGapNames = listOf("TIGHT", "STANDARD", "LOOSE")
+        barcodeGapGroup = makeRadioGroup(barcodeGapOptions, selectedId(prefs.getString("barcode_gap_mode", "STANDARD") ?: "STANDARD", 3112, barcodeGapOptions, barcodeGapNames))
+
+        val chartStyleOptions = listOf(7001 to "折线\n看趋势", 7002 to "柱状\n看每天差异")
+        val chartStyleNames = listOf(ChartStyleMode.LINE.name, ChartStyleMode.BAR.name)
+        chartStyleGroup = makeRadioGroup(chartStyleOptions, selectedId(prefs.getString("chart_style_mode", ChartStyleMode.LINE.name) ?: ChartStyleMode.LINE.name, 7001, chartStyleOptions, chartStyleNames), RadioGroup.HORIZONTAL)
+
+        val yAxisOptions = listOf(7101 to "自动\n按数据自己缩放", 7102 to "固定\n不同周期更好对比")
+        val yAxisNames = listOf(YAxisMode.AUTO.name, YAxisMode.FIXED.name)
+        yAxisModeGroup = makeRadioGroup(yAxisOptions, selectedId(prefs.getString("y_axis_mode", YAxisMode.AUTO.name) ?: YAxisMode.AUTO.name, 7101, yAxisOptions, yAxisNames), RadioGroup.HORIZONTAL)
+
+        val autoOptions = listOf(8001 to "每日定时一次（推荐）\n省电，适合稳定更新", 8002 to "熄屏触发\n更及时，但更耗电")
+        val autoNames = listOf(AutoRefreshConfig.MODE_DAILY, AutoRefreshConfig.MODE_SCREEN_OFF)
+        autoModeGroup = makeRadioGroup(autoOptions, selectedId(prefs.getString(AutoRefreshConfig.KEY_AUTO_MODE, AutoRefreshConfig.MODE_DAILY) ?: AutoRefreshConfig.MODE_DAILY, 8001, autoOptions, autoNames))
+
+        includeUnreadCheck = makeCheck(prefs.getBoolean("include_unread", false))
+        showProgressStatusCheck = makeCheck(prefs.getBoolean("show_progress_status", true))
+        showAuthorCheck = makeCheck(prefs.getBoolean("show_author", true))
+        showBookDurationCheck = makeCheck(prefs.getBoolean("show_book_duration", true))
+        showChartCheck = makeCheck(prefs.getBoolean("show_chart", true))
+        showPeakLabelCheck = makeCheck(prefs.getBoolean("show_peak_label", true))
+        readingDataStoreCheck = makeCheck(
+            prefs.getBoolean(AutoRefreshConfig.KEY_READING_DATA_STORE_ENABLED, false)
+        )
+        autoRefreshCheck = makeCheck(prefs.getBoolean(AutoRefreshConfig.KEY_AUTO_ENABLED, true))
+
+        minDurationInput = makeInput(prefs.getInt("min_duration_minutes", 1).toString())
+        topNInput = makeInput(prefs.getInt("top_n", 5).coerceIn(1, 5).toString())
+        titleInput = makeInput(prefs.getString("receipt_title", "阅读账单") ?: "阅读账单")
+        titleSizeInput = makeInput((prefs.getFloat("receipt_title_size", 74f)).toInt().toString())
+        bodySizeInput = makeInput((prefs.getFloat("receipt_body_size", 34f)).toInt().toString())
+        serialCustomInput = makeInput(prefs.getString("serial_number_custom", "") ?: "")
+        serialNumberSizeInput = makeInput((prefs.getFloat("serial_number_size", 46f)).toInt().toString())
+        customWallpaperWidthInput = makeInput(prefs.getInt("custom_wallpaper_width", BooxDevicePresets.byKey(defaultBooxDevicePreset).widthPx).coerceIn(300, 4000).toString())
+        customWallpaperHeightInput = makeInput(prefs.getInt("custom_wallpaper_height", BooxDevicePresets.byKey(defaultBooxDevicePreset).heightPx).coerceIn(300, 4000).toString())
+        noteInput = makeInput(prefs.getString("note_text", "") ?: "")
+        yAxisMaxInput = makeInput(prefs.getInt("y_axis_fixed_max_minutes", 300).toString())
+        autoDailyTimeInput = makeInput(prefs.getString(AutoRefreshConfig.KEY_DAILY_TIME, "22:30") ?: "22:30")
+        autoMinIntervalInput = makeInput(prefs.getInt(AutoRefreshConfig.KEY_SCREEN_OFF_MIN_INTERVAL, 3).toString())
+        titleFontSpinner = buildFontSpinner("title_font", "SERIF_BOLD")
+        bodyFontSpinner = buildFontSpinner("body_font", "MONO")
+
+        root.addView(hiddenHost)
+
+        addSectionTitle("数据与统计", "周期、数据来源、设备尺寸与时长单位")
+        bindToggle("启用阅读数据落库", readingDataStoreCheck)
+        addHint("说明：默认关闭以降低低性能墨水屏设备的历史扫描、封面缓存和数据库写入开销。开启后会在启动、解锁或定时任务中维护 Neo 与微信读书日级记录，供微信/混合月历持续积累历史；关闭不会删除已有数据，Neo 月历仍可实时读取，微信和混合月历只能手动查看已有缓存，自动任务会保留现有壁纸。")
+        val booxDevicePresetRow = bindRadioChoiceRow("阅读器尺寸预设", booxDevicePresetGroup, booxDevicePresetOptions)
+        appendUiDebug("buildSettingsPage added booxDevicePresetRow rootChildCount=${root.childCount} rowChildren=${booxDevicePresetRow.childCount}")
+        addHint("说明：首次会根据本机型号自动匹配；匹配不到时默认 Leaf5。这个选项会影响预览和生成壁纸的图片分辨率。")
+        val customWidthRow = bindEditRow("自定义宽度(px)", customWallpaperWidthInput, numericOnly = true, maxDigits = 4)
+        val customHeightRow = bindEditRow("自定义高度(px)", customWallpaperHeightInput, numericOnly = true, maxDigits = 4)
+        addHint("说明：只有选择“自定义分辨率”时生效。请填写最终壁纸图片的宽和高，例如 P6 Pro 竖屏常用 824 x 1648。")
+        val periodSegment = bindSegmented("统计周期", periodGroup, periodOptions, isVertical = false)
+        addHint("说明：选择账单统计哪一段时间；自定义模式会显示起止日期选择。月历封面墙复用这个周期：选择“本月”时显示当前自然月；选择“最近30天”或其它周期时，会显示该周期结束日期所在月份的月历。")
+        val sourceSegment = bindSegmented("数据来源", sourceGroup, sourceOptions, isVertical = true)
+        addHint("说明：Neo 阅读器读取文石本地数据库，适合离线使用；微信读书需要联网读取 API；混合来源会把本地和微信的统计时长相加，书单按阅读时长合并排序，封面按最近阅读来源选择，失败时回退另一来源。混合来源包含联网数据，因此自动模式下不会在熄屏瞬间请求网络，而是在解锁后刷新，通常下一次锁屏看到新图；如果微信读书读取失败，会继续使用本地数据。")
+        val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
+        val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单；月历封面墙按所选来源读取数据，Neo 使用本地阅读事件，微信读书使用精确每日总时长和快照差分确认的日级书籍。提示：Neo 封面依赖 NeoReader 自身写入本地元数据，通常退出当前书籍后再锁屏更容易刷新；微信数据在解锁后生成，通常下一次锁屏显示最新结果。")
+        val statsTemplateSegment = bindSegmented("统计壁纸模板", statsTemplateGroup, statsTemplateOptions, isVertical = true)
+        val statsTemplateHint = addHint("说明：摘录菜单会保留票据顶部和书单编号，右侧按阅读时长换算价格；价格=向上取整(阅读分钟÷10)，最低¥1，封顶¥999。微信读书书籍会尝试显示最新划线或想法，没有摘录则不显示。")
+        val calendarStackOrderSegment = bindSegmented(
+            "月历封面堆叠顺序",
+            calendarStackOrderGroup,
+            calendarStackOrderOptions,
+            isVertical = true
+        )
+        val calendarStackOrderHint = addHint("说明：控制每日封面堆叠中最上方显示哪本书；最多仍显示4本，不改变每日阅读时长统计。")
+        val coverFitSegment = bindSegmented("封面显示方式", coverFitModeGroup, coverFitOptions, isVertical = false)
+        val timeUnitSegment = bindSegmented("时长显示单位", timeUnitGroup, timeUnitOptions, isVertical = false)
+        addHint("说明：小时模式更适合壁纸阅读，分钟模式更适合精确核对。")
+        val weekStartRow = bindInputRow("选择起始日期", { selectedWeekStartYmd.ifBlank { currentWeekStartYmd() } }) { openWeekStartDatePicker() }.first
+        weekStartText = weekStartRow.getChildAt(1) as TextView
+        val weekEndRow = bindInputRow("选择结束日期", { selectedWeekEndYmd.ifBlank { currentWeekEndYmd() } }) { openWeekEndDatePicker() }.first
+        weekEndText = weekEndRow.getChildAt(1) as TextView
+
+        addSectionTitle("书单筛选", "控制展示书目与统计阈值")
+        val includeUnreadRow = bindToggle("最近阅读包含未读（readingStatus=0）", includeUnreadCheck)
+        addHint("说明：关闭后会尽量排除只进过书库但没真正开始读的书。")
+        val readingFilterSegment = bindSegmented("书单筛选（状态）", readingFilterGroup, readingFilterOptions, isVertical = false)
+        val topNSlider = bindSlider("Top N（最多显示书籍数量）", topNInput, 1, 5)
+        addHint("说明：默认最多5本；如果底部还要显示图表和条码，3本会更宽松。")
+        val minDurationSlider = bindSlider("最小时长阈值（分钟，作用于“按阅读时长事件”）", minDurationInput, 0, 240)
+        addHint("说明：小于这个时长的阅读事件会被忽略，可过滤误打开。")
+
+        addSectionTitle("排版与字体", "标题、字号、进度与字体")
+        val titleRow = bindEditRow("账单标题", titleInput)
+        addHint("说明：会显示在壁纸右上角，例如“阅读账单”或“留台单”。")
+        val titleSizeSlider = bindSlider("标题字号", titleSizeInput, 24, 120)
+        val bodySizeSlider = bindSlider("正文字号基准", bodySizeInput, 18, 60)
+        addHint("说明：字号会影响整张壁纸能放下多少内容；书多时建议调小。")
+        val serialSegment = bindSegmented("单号数字模式", serialModeGroup, serialOptions, isVertical = false)
+        val serialCustomRow = bindEditRow("自定义数字", serialCustomInput, numericOnly = true, maxDigits = 12)
+        val serialSizeSlider = bindSlider("单号数字字号", serialNumberSizeInput, 24, 140)
+        addHint("说明：数字变大时会向上扩展，避免挤压下面的操作编号。")
+        val progressStatusRow = bindToggle("显示进度和状态行", showProgressStatusCheck)
+        addHint("说明：关闭后书单更简洁，但看不到读到哪里。")
+        val progressSegment = bindSegmented("进度显示方式", progressModeGroup, progressOptions, isVertical = false)
+        val authorRow = bindToggle("显示作者行（在进度行上方）", showAuthorCheck)
+        addHint("说明：如果文石元数据里没有作者，会显示未知；关闭后可节省空间。")
+        val bookDurationRow = bindToggle("显示每本书籍阅读时长", showBookDurationCheck)
+        addHint("说明：打开后会在每本书的状态后追加“时长”；Neo 阅读器按本地阅读事件统计，微信读书按接口返回的阅读时长显示。")
+        val titleFontRow = bindSpinnerRow("标题字体（系统字体）", titleFontSpinner)
+        val bodyFontRow = bindSpinnerRow("正文字体（系统字体）", bodyFontSpinner)
+        pickFontDirBtn = Button(this).apply {
+            visibility = View.GONE
+            setOnClickListener { pickFontTreeLauncher.launch(null) }
+            hiddenHost.addView(this)
+        }
+        val fontDirRow = bindInputRow("选择字体目录（SAF）", { selectedFontDirUri?.let { "已选择 ▼" } ?: "未选择 ▼" }) {
+            pickFontTreeLauncher.launch(null)
+        }.first
+        addHint("说明：选择存储/Fonts 后，可在标题字体和正文字体里使用里面的 ttf/otf 字体。")
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         fontScanText = TextView(this).apply {
             text = fontScanReport
             textSize = 13f
@@ -1017,6 +1371,7 @@ class MainActivity : ComponentActivity() {
         }
         root.addView(fontScanText)
 
+<<<<<<< HEAD
         val nicknameRow = bindEditRow("学厨名称", nicknameInput)
 
         val (stickerRow, stickerValue) = bindInputRow("选择贴纸", {
@@ -1045,6 +1400,30 @@ class MainActivity : ComponentActivity() {
         val autoModeSegment = bindSegmented("壁纸刷新模式", autoModeGroup, autoOptions, isVertical = true)
 
         val autoDailyRow = bindInputRow("每日定时触发时间", { normalizeDailyTime(autoDailyTimeInput.text.toString()) }) { openDailyTimePicker() }.first
+=======
+        addSectionTitle("图表", "图形样式与坐标设置")
+        val chartToggleRow = bindToggle("显示下方周曲线图", showChartCheck)
+        addHint("说明：打开后能看到时间分布；如果书单或备注太多，可关闭节省空间。")
+        val chartStyleSegment = bindSegmented("图表样式", chartStyleGroup, chartStyleOptions, isVertical = false)
+        val chartRuleHint = addHint("图表横轴规则：当天/昨天=按小时；本周/上周/最近7天=按天；最近30天=按天；自定义<=14天按天，15-90天按周，>90天按月。")
+        val peakLabelRow = bindToggle("显示峰值标签", showPeakLabelCheck)
+        val yAxisSegment = bindSegmented("Y轴最大值", yAxisModeGroup, yAxisOptions, isVertical = false)
+        val yAxisFixedSlider = bindSlider("Y轴固定最大值(分钟)", yAxisMaxInput, 1, 2000)
+        addHint("说明：固定值越大，柱子/曲线越矮；用于不同周期之间保持同一比例。")
+
+        addSectionTitle("底部备注与条码", "备注文本与装饰条码参数")
+        val footerSegment = bindSegmented("底部备注/条码", footerModeGroup, footerOptions, isVertical = true)
+        val noteRow = bindEditRow("备注文本 / 条码内容", noteInput)
+        addHint("说明：备注会显示在底部；条码只是装饰风格，不保证所有扫码软件都能识别。")
+        val barcodeWidthSegment = bindSegmented("条码粗细强度", barcodeWidthGroup, barcodeWidthOptions, isVertical = false)
+        val barcodeGapSegment = bindSegmented("条码留白密度", barcodeGapGroup, barcodeGapOptions, isVertical = false)
+
+        addSectionTitle("自动刷新", "默认自动模式，可切换定时或熄屏触发")
+        val autoToggleRow = bindToggle("启用自动刷新与自动覆盖保存", autoRefreshCheck)
+        addHint("说明：开启后 App 会按自动模式覆盖保存同一张壁纸图片。")
+        val autoModeSegment = bindSegmented("自动刷新模式", autoModeGroup, autoOptions, isVertical = true)
+        val autoDailyRow = bindInputRow("每日执行时间", { normalizeDailyTime(autoDailyTimeInput.text.toString()) }) { openDailyTimePicker() }.first
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val autoDailyValue = autoDailyRow.getChildAt(1) as TextView
         autoDailyTimeInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -1052,6 +1431,10 @@ class MainActivity : ComponentActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
         val autoMinIntervalSlider = bindSlider("熄屏触发最小间隔(分钟)", autoMinIntervalInput, 1, 240)
+<<<<<<< HEAD
+=======
+        addHint("说明：间隔越短越及时，也越容易增加耗电；3分钟是折中值。")
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         autoModeHintText = TextView(this).apply {
             textSize = 13f
             setTextColor(Color.DKGRAY)
@@ -1064,9 +1447,36 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 0, 0, 16)
             root.addView(this)
         }
+<<<<<<< HEAD
 
         wereadApiKeyInput = makeInput(WeReadClient.loadApiKey(this))
         val wereadKeyRow = bindSecretEditRow("微信读书API Key", wereadApiKeyInput)
+=======
+        val autoWarningText = addHint("提示：熄屏触发会增加唤醒次数与耗电；NeoReader 常在退出当前书籍/会话落库后才更新元数据，所以可能出现“本次锁屏仍是旧封面、下次锁屏生效”的现象。")
+
+        addSectionTitle("微信读书", "配置 API Key，支持手动生成与解锁预热刷新")
+        wereadApiKeyInput = makeInput(WeReadClient.loadApiKey(this))
+        val wereadKeyRow = bindSecretEditRow("API Key", wereadApiKeyInput)
+        val wereadStatsModeOptions = listOf(9001 to "本周\nweekly", 9002 to "本月\nmonthly", 9003 to "今年\nannually", 9004 to "总计\noverall")
+        val wereadStatsModeNames = listOf("weekly", "monthly", "annually", "overall")
+        wereadStatsModeGroup = makeRadioGroup(
+            wereadStatsModeOptions,
+            selectedId(
+                getSharedPreferences("weread_settings", Context.MODE_PRIVATE).getString("weread_stats_mode", "monthly") ?: "monthly",
+                9002,
+                wereadStatsModeOptions,
+                wereadStatsModeNames
+            ),
+            RadioGroup.HORIZONTAL
+        )
+        val wereadStatsModeSegment = bindSegmented("统计测试周期", wereadStatsModeGroup, wereadStatsModeOptions, isVertical = false)
+        wereadStatusText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(Color.DKGRAY)
+            setPadding(0, 0, 0, 16)
+            root.addView(this)
+        }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val wereadButtons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 24)
@@ -1075,6 +1485,10 @@ class MainActivity : ComponentActivity() {
             text = "保存 Key"
             setOnClickListener {
                 saveWeReadApiKeyFromUi()
+<<<<<<< HEAD
+=======
+                renderWeReadState(WeReadClient.cachedState(this@MainActivity))
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                 writeDebugLog("weread_key_saved")
             }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0, 0, 12, 0) })
@@ -1083,6 +1497,71 @@ class MainActivity : ComponentActivity() {
             setOnClickListener { testWeReadConnection() }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(wereadButtons)
+<<<<<<< HEAD
+=======
+        root.addView(Button(this).apply {
+            text = "读取统计测试"
+            setOnClickListener { testWeReadStats() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        root.addView(Button(this).apply {
+            text = "缓存最近封面测试"
+            setOnClickListener { testWeReadCoverCache() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        root.addView(Button(this).apply {
+            text = "清理所有封面缓存"
+            setOnClickListener { clearAllCoverCaches() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        root.addView(Button(this).apply {
+            text = "预览微信账单测试"
+            setOnClickListener { previewWeReadWallpaper() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        root.addView(Button(this).apply {
+            text = "生成微信账单测试"
+            setOnClickListener { generateWeReadWallpaper() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 24) })
+        addHint("当前书识别：微信读书封面按 /shelf/sync 中 readUpdateTime 最新的书籍判断，不是直接读取微信读书正在显示的前台页面。刚切换书籍时微信同步可能有延迟，通常下一次解锁或手动刷新后会更新。")
+        addHint("说明：连接和最近封面会调用 /shelf/sync；统计壁纸会调用 /readdata/detail；封面会缓存到 App 私有目录。选择“数据来源=微信读书”后，手动预览/生成会立即联网；自动模式下不在熄屏时联网，而是在解锁后预热刷新，网络未恢复会短间隔重试，成功后覆盖保存到 Pictures/NeoReader/neoreader_wallpaper.png。Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。")
+        renderWeReadState(WeReadClient.cachedState(this))
+
+        addSectionTitle("版本与更新", "GitHub Release 分发与更新检查")
+        updateStatusText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(Color.DKGRAY)
+            setPadding(0, 0, 0, 16)
+            root.addView(this)
+        }
+        val updateButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 24)
+        }
+        updateButtons.addView(Button(this).apply {
+            text = "检查更新"
+            setOnClickListener { checkForUpdatesIfNeeded(force = true) }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0, 0, 12, 0) })
+        updateButtons.addView(Button(this).apply {
+            text = "打开 Release 页面"
+            setOnClickListener { openReleasePage() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(updateButtons)
+        addHint("说明：App 只检查并跳转 GitHub Release 页面，不会自动下载或安装 APK。")
+        updateReleaseStatusFromCache()
+
+        addSectionTitle("联系开发者", "反馈问题、关注更新、请喝奶茶")
+        val contactButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 16)
+        }
+        contactButtons.addView(Button(this).apply {
+            text = "关注小红书 (๑•̀ㅂ•́)و✧"
+            setOnClickListener { openXhsProfile() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0, 0, 12, 0) })
+        contactButtons.addView(Button(this).apply {
+            text = "请喝奶茶 🧋 (｡･ω･｡)ﾉ♡"
+            setOnClickListener { showSponsorQrDialog() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(contactButtons)
+
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         statusText = TextView(this).apply {
             text = "设置后点击按钮生成。"
             textSize = 16f
@@ -1092,10 +1571,17 @@ class MainActivity : ComponentActivity() {
         }
 
         fun updateConditionalVisibility() {
+<<<<<<< HEAD
+=======
+            val customPeriod = periodGroup.checkedRadioButtonId == 4005
+            weekStartRow.visibility = if (customPeriod) View.VISIBLE else View.GONE
+            weekEndRow.visibility = if (customPeriod) View.VISIBLE else View.GONE
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
             val customSize = booxPresetKeyByRadioId(booxDevicePresetGroup.checkedRadioButtonId) == BooxDevicePresets.CUSTOM_KEY
             customWidthRow.visibility = if (customSize) View.VISIBLE else View.GONE
             customHeightRow.visibility = if (customSize) View.VISIBLE else View.GONE
 
+<<<<<<< HEAD
             coverFitSegment.visibility = View.GONE
 
             noteRow.visibility = View.VISIBLE
@@ -1109,6 +1595,60 @@ class MainActivity : ComponentActivity() {
 
         periodGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
         autoModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+=======
+            val coverOptsVisible = wallpaperModeGroup.checkedRadioButtonId == 1202 || wallpaperModeGroup.checkedRadioButtonId == 1203
+            coverFitSegment.visibility = if (coverOptsVisible) View.VISIBLE else View.GONE
+            val statsVisible = wallpaperModeGroup.checkedRadioButtonId == 1201
+            statsTemplateSegment.visibility = if (statsVisible) View.VISIBLE else View.GONE
+            statsTemplateHint.visibility = if (statsVisible) View.VISIBLE else View.GONE
+            val calendarVisible = wallpaperModeGroup.checkedRadioButtonId == 1204
+            calendarStackOrderSegment.visibility = if (calendarVisible) View.VISIBLE else View.GONE
+            calendarStackOrderHint.visibility = if (calendarVisible) View.VISIBLE else View.GONE
+
+            serialCustomRow.visibility = if (serialModeGroup.checkedRadioButtonId == 2013) View.VISIBLE else View.GONE
+
+            val showChart = showChartCheck.isChecked
+            chartStyleSegment.visibility = if (showChart) View.VISIBLE else View.GONE
+            chartRuleHint.visibility = if (showChart) View.VISIBLE else View.GONE
+            peakLabelRow.visibility = if (showChart) View.VISIBLE else View.GONE
+            yAxisSegment.visibility = if (showChart) View.VISIBLE else View.GONE
+            yAxisFixedSlider.visibility = if (showChart && yAxisModeGroup.checkedRadioButtonId == 7102) View.VISIBLE else View.GONE
+
+            val footerMode = footerModeGroup.checkedRadioButtonId
+            noteRow.visibility = if (footerMode != 3001) View.VISIBLE else View.GONE
+            barcodeWidthSegment.visibility = if (footerMode == 3003) View.VISIBLE else View.GONE
+            barcodeGapSegment.visibility = if (footerMode == 3003) View.VISIBLE else View.GONE
+
+            val autoEnabled = autoRefreshCheck.isChecked
+            autoModeSegment.visibility = if (autoEnabled) View.VISIBLE else View.GONE
+            autoDailyRow.visibility = if (autoEnabled && autoModeGroup.checkedRadioButtonId == 8001) View.VISIBLE else View.GONE
+            autoMinIntervalSlider.visibility = if (autoEnabled && autoModeGroup.checkedRadioButtonId == 8002) View.VISIBLE else View.GONE
+            autoModeHintText.visibility = if (autoEnabled) View.VISIBLE else View.GONE
+            autoStateText.visibility = if (autoEnabled) View.VISIBLE else View.GONE
+            autoWarningText.visibility = if (autoEnabled) View.VISIBLE else View.GONE
+        }
+
+        showChartCheck.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        periodGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        yAxisModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        footerModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        autoRefreshCheck.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        readingDataStoreCheck.setOnCheckedChangeListener { _, enabled ->
+            if (!isInitializingUi) {
+                getSharedPreferences(AutoRefreshConfig.PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(AutoRefreshConfig.KEY_READING_DATA_STORE_ENABLED, enabled)
+                    .apply()
+                applySettingsPreview()
+                if (enabled) startReadingStoreBootstrapIfNeeded()
+            }
+        }
+        autoModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        serialModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        wallpaperModeGroup.setOnCheckedChangeListener { _, _ -> updateConditionalVisibility(); if (!isInitializingUi) applySettingsPreview() }
+        statsTemplateGroup.setOnCheckedChangeListener { _, _ -> if (!isInitializingUi) applySettingsPreview() }
+        calendarStackOrderGroup.setOnCheckedChangeListener { _, _ -> if (!isInitializingUi) applySettingsPreview() }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         booxDevicePresetGroup.setOnCheckedChangeListener { _, _ ->
             updateConditionalVisibility()
             if (!isInitializingUi) {
@@ -1117,6 +1657,12 @@ class MainActivity : ComponentActivity() {
                     .putBoolean("boox_device_preset_user_set", true)
                     .apply()
                 applySettingsPreview()
+<<<<<<< HEAD
+=======
+                if (wallpaperModeGroup.checkedRadioButtonId == 1201) {
+                    changeStateText.text = "状态: 尺寸已切换，统计壁纸预览已重新生成｜尺寸: $previewPresetText"
+                }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
             }
         }
         updateConditionalVisibility()
@@ -1130,11 +1676,62 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun attachAutoRefreshListeners() {
+<<<<<<< HEAD
         coverFitModeGroup.setOnCheckedChangeListener { _, _ ->
             if (!isInitializingUi) applySettingsPreview()
         }
         titleFontSpinner.setOnItemSelectedListener(SimpleItemSelectedListener { if (!isInitializingUi) applySettingsPreview() })
         bodyFontSpinner.setOnItemSelectedListener(SimpleItemSelectedListener { if (!isInitializingUi) applySettingsPreview() })
+=======
+        includeUnreadCheck.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        showProgressStatusCheck.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        showAuthorCheck.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        showBookDurationCheck.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        showPeakLabelCheck.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        sourceGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        coverFitModeGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        readingFilterGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        progressModeGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        timeUnitGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        chartStyleGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        barcodeWidthGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        barcodeGapGroup.setOnCheckedChangeListener { _, _ ->
+            if (!isInitializingUi) applySettingsPreview()
+        }
+        titleFontSpinner.setOnItemSelectedListener(SimpleItemSelectedListener { if (!isInitializingUi) applySettingsPreview() })
+        bodyFontSpinner.setOnItemSelectedListener(SimpleItemSelectedListener { if (!isInitializingUi) applySettingsPreview() })
+        minDurationInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         topNInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -1156,6 +1753,37 @@ class MainActivity : ComponentActivity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+<<<<<<< HEAD
+=======
+        titleSizeInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        bodySizeInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        serialNumberSizeInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        serialCustomInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         customWallpaperWidthInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -1170,6 +1798,16 @@ class MainActivity : ComponentActivity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+<<<<<<< HEAD
+=======
+        yAxisMaxInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isInitializingUi) applySettingsPreview()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         autoDailyTimeInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -1190,11 +1828,68 @@ class MainActivity : ComponentActivity() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
         saveAndApplyAutoRefreshSettings()
+<<<<<<< HEAD
         previewPresetText = wallpaperSizeDisplayText(settings)
         statusText.text = "微信读书来源已保存\n请点击“刷新预览”或“生成壁纸”获取最新内容。"
         changeStateText.text = "状态: 微信读书来源参数已变更（未联网）｜尺寸: $previewPresetText"
         refreshPreview()
         writeDebugLog("weread_source_settings_saved")
+=======
+        if (settings.sourceMode == DataSourceMode.WEREAD || settings.sourceMode == DataSourceMode.MIXED) {
+            previewPresetText = wallpaperSizeDisplayText(settings)
+            val label = if (settings.sourceMode == DataSourceMode.MIXED) "混合来源" else "微信读书来源"
+            statusText.text = "$label 已保存\n请点击“刷新预览”或“生成壁纸”获取最新内容。"
+            changeStateText.text = "状态: $label 参数已变更（未联网）｜尺寸: $previewPresetText"
+            refreshPreview()
+            writeDebugLog(if (settings.sourceMode == DataSourceMode.MIXED) "mixed_source_settings_saved" else "weread_source_settings_saved")
+            return
+        }
+        val (bmp, result) = renderWallpaperPreview(settings)
+        previewBitmap = bmp
+        previewPresetText = wallpaperSizeDisplayText(settings)
+        statusText.text = "预览已更新（未写入文件）\n$result"
+        changeStateText.text = "状态: 参数已变更（仅预览）｜尺寸: $previewPresetText"
+        refreshPreview()
+        writeDebugLog("preview_updated")
+    }
+
+    private fun openWeekStartDatePicker() {
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        parseWeek(selectedWeekStartYmd)?.let { cal.timeInMillis = it.first }
+        DatePickerDialog(
+            this,
+            { _, year, month, dayOfMonth ->
+                val picked = Calendar.getInstance(TimeZone.getDefault())
+                picked.set(year, month, dayOfMonth, 0, 0, 0)
+                picked.set(Calendar.MILLISECOND, 0)
+                selectedWeekStartYmd = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(picked.timeInMillis))
+                weekStartText.text = selectedWeekStartYmd
+                if (!isInitializingUi) applySettingsPreview()
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    private fun openWeekEndDatePicker() {
+        val cal = Calendar.getInstance(TimeZone.getDefault())
+        parseYmd(selectedWeekEndYmd)?.let { cal.timeInMillis = it }
+        DatePickerDialog(
+            this,
+            { _, year, month, dayOfMonth ->
+                val picked = Calendar.getInstance(TimeZone.getDefault())
+                picked.set(year, month, dayOfMonth, 0, 0, 0)
+                picked.set(Calendar.MILLISECOND, 0)
+                selectedWeekEndYmd = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(picked.timeInMillis))
+                weekEndText.text = selectedWeekEndYmd
+                if (!isInitializingUi) applySettingsPreview()
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     }
 
     private fun openDailyTimePicker() {
@@ -1214,6 +1909,7 @@ class MainActivity : ComponentActivity() {
         ).show()
     }
 
+<<<<<<< HEAD
     private fun showStickerSelectionDialog() {
         val options = arrayOf("drink 贴纸", "pudding 贴纸", "从本地导入", "清除选择")
         AlertDialog.Builder(this)
@@ -1252,6 +1948,30 @@ class MainActivity : ComponentActivity() {
 
     private fun saveAndApplyAutoRefreshSettings() {
         val isEnabled = true
+=======
+    private fun generateAndSaveFromCurrentSettings() {
+        val settings = readSettingsFromUi()
+        if (settings.sourceMode == DataSourceMode.WEREAD || settings.sourceMode == DataSourceMode.MIXED) {
+            generateWeReadWallpaper()
+            return
+        }
+        saveSettings(settings)
+        saveAndApplyAutoRefreshSettings()
+        val (bmp, result) = renderWallpaperPreview(settings)
+        previewBitmap = bmp
+        previewPresetText = wallpaperSizeDisplayText(settings)
+        val saved = saveBitmapToPictures(bmp)
+        lastSavedPath = saved
+        statusText.text = "已生成并覆盖文件\n$result\n路径: $saved"
+        changeStateText.text = "状态: 已生成并保存｜尺寸: $previewPresetText"
+        refreshPreview()
+        showPreviewPage()
+        writeDebugLog("generated_saved")
+    }
+
+    private fun saveAndApplyAutoRefreshSettings() {
+        val isEnabled = autoRefreshCheck.isChecked
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val mode = if (autoModeGroup.checkedRadioButtonId == 8002) AutoRefreshConfig.MODE_SCREEN_OFF else AutoRefreshConfig.MODE_DAILY
         val dailyTime = normalizeDailyTime(autoDailyTimeInput.text.toString())
         val minInterval = autoMinIntervalInput.text.toString().trim().toIntOrNull()?.coerceIn(1, 240) ?: 3
@@ -1275,7 +1995,15 @@ class MainActivity : ComponentActivity() {
 
     private fun updateAutoRefreshHint() {
         val mode = if (::autoModeGroup.isInitialized && autoModeGroup.checkedRadioButtonId == 8002) "熄屏触发" else "每日定时"
+<<<<<<< HEAD
         autoModeHintText.text = "当前自动模式：$mode，熄屏最小间隔=${autoMinIntervalInput.text}"
+=======
+        autoModeHintText.text = if (::autoRefreshCheck.isInitialized && autoRefreshCheck.isChecked) {
+            "当前自动模式：$mode，熄屏最小间隔=${autoMinIntervalInput.text}"
+        } else {
+            "当前自动模式：已关闭"
+        }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     }
 
     private fun updateAutoRuntimeState() {
@@ -1311,26 +2039,88 @@ class MainActivity : ComponentActivity() {
         autoStateText.text = "自动状态：$runtimeHint\n最近触发：$lastTime（$lastReason）\n当前参数：模式=$mode，定时=$dailyTime，熄屏间隔=${minInterval}分钟"
     }
 
+<<<<<<< HEAD
+=======
+    private fun updateReleaseStatusFromCache() {
+        if (!::updateStatusText.isInitialized) return
+        renderReleaseState(GitHubReleaseChecker.cachedState(this))
+    }
+
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     private fun saveWeReadApiKeyFromUi() {
         if (!::wereadApiKeyInput.isInitialized) return
         WeReadClient.saveApiKey(this, wereadApiKeyInput.text.toString())
         appendUiDebug("weread api key saved key=${WeReadClient.maskKey(wereadApiKeyInput.text.toString())}")
     }
 
+<<<<<<< HEAD
+=======
+    private fun clearAllCoverCaches() {
+        val targets = listOf(
+            File(cacheDir, "extracted_covers"),
+            File(cacheDir, "covers")
+        )
+        var fileCount = 0
+        var byteCount = 0L
+        targets.forEach { dir ->
+            if (dir.exists()) {
+                dir.walkTopDown()
+                    .filter { it.isFile }
+                    .forEach {
+                        fileCount += 1
+                        byteCount += it.length()
+                    }
+                dir.deleteRecursively()
+            }
+        }
+        WeReadClient.clearCoverCacheState(this)
+        val message = "已清理封面缓存：${fileCount}个文件，${formatBytes(byteCount)}"
+        AutoRefreshLog.i(this, "cover cache cleared files=$fileCount bytes=$byteCount")
+        appendUiDebug("cover cache cleared files=$fileCount bytes=$byteCount")
+        if (::statusText.isInitialized) statusText.text = message
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "${wereadStatusText.text}\n$message"
+        }
+        writeDebugLog("cover_cache_cleared")
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes >= 1024L * 1024L -> String.format(Locale.US, "%.1f MB", bytes / 1024f / 1024f)
+            bytes >= 1024L -> String.format(Locale.US, "%.1f KB", bytes / 1024f)
+            else -> "${bytes} B"
+        }
+    }
+
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     private fun testWeReadConnection() {
         if (isTestingWeRead) return
         saveWeReadApiKeyFromUi()
         isTestingWeRead = true
+<<<<<<< HEAD
+=======
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "微信读书：正在测试连接..."
+        }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         Thread {
             val result = WeReadClient.testConnection(applicationContext, WeReadClient.loadApiKey(applicationContext))
             runOnUiThread {
                 isTestingWeRead = false
+<<<<<<< HEAD
+=======
+                renderWeReadState(WeReadClient.cachedState(this))
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n本次结果：${result.detail.take(160)}"
+                }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                 appendUiDebug("weread test ok=${result.ok} detail=${result.detail.take(120)}")
                 writeDebugLog("weread_test")
             }
         }.start()
     }
 
+<<<<<<< HEAD
     private fun weReadPeriodLabel(periodMode: PeriodMode): String {
         return when (periodMode) {
             PeriodMode.RECENT -> "最近"
@@ -1339,15 +2129,102 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+=======
+    private fun selectedWeReadStatsMode(): String {
+        return when (if (::wereadStatsModeGroup.isInitialized) wereadStatsModeGroup.checkedRadioButtonId else 9002) {
+            9001 -> "weekly"
+            9003 -> "annually"
+            9004 -> "overall"
+            else -> "monthly"
+        }
+    }
+
+    private fun saveWeReadStatsModeFromUi(): String {
+        val mode = selectedWeReadStatsMode()
+        getSharedPreferences("weread_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("weread_stats_mode", mode)
+            .apply()
+        return mode
+    }
+
+    private fun weReadPeriodLabel(periodMode: PeriodMode): String {
+        return when (periodMode) {
+            PeriodMode.TODAY -> "当天"
+            PeriodMode.YESTERDAY -> "昨天"
+            PeriodMode.THIS_WEEK -> "本周"
+            PeriodMode.LAST_WEEK -> "上周"
+            PeriodMode.THIS_MONTH -> "本月"
+            PeriodMode.LAST_7_DAYS -> "最近7天"
+            PeriodMode.LAST_30_DAYS -> "最近30天"
+            PeriodMode.CUSTOM -> "自定义周期"
+        }
+    }
+
+    private fun testWeReadStats() {
+        if (isTestingWeRead) return
+        saveWeReadApiKeyFromUi()
+        val mode = saveWeReadStatsModeFromUi()
+        isTestingWeRead = true
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "微信读书：正在读取${WeReadClient.modeLabel(mode)}统计..."
+        }
+        Thread {
+            val result = WeReadClient.fetchReadStats(applicationContext, WeReadClient.loadApiKey(applicationContext), mode)
+            runOnUiThread {
+                isTestingWeRead = false
+                lastWeReadStatsDebug = "ok=${result.ok}, mode=${result.mode}, totalSeconds=${result.totalReadSeconds}, dayAverageSeconds=${result.dayAverageSeconds}, readDays=${result.readDays}, top=${result.topBooks.joinToString("|")}, detail=${result.detail}"
+                renderWeReadState(WeReadClient.cachedState(this))
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n统计结果：${result.detail.take(260)}"
+                }
+                appendUiDebug("weread stats $lastWeReadStatsDebug")
+                writeDebugLog("weread_stats_test")
+            }
+        }.start()
+    }
+
+    private fun testWeReadCoverCache() {
+        if (isTestingWeRead) return
+        saveWeReadApiKeyFromUi()
+        isTestingWeRead = true
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "微信读书：正在缓存最近阅读封面..."
+        }
+        Thread {
+            val result = WeReadClient.cacheLatestCover(applicationContext, WeReadClient.loadApiKey(applicationContext))
+            runOnUiThread {
+                isTestingWeRead = false
+                lastWeReadCoverDebug = "ok=${result.ok}, status=${result.status}, title=${result.title}, author=${result.author}, bookId=${result.bookId}, bytes=${result.bytes}, fromCache=${result.fromCache}, path=${result.cachePath}, detail=${result.detail}"
+                renderWeReadState(WeReadClient.cachedState(this))
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n封面结果：${result.detail.take(220)}"
+                }
+                appendUiDebug("weread cover $lastWeReadCoverDebug")
+                writeDebugLog("weread_cover_cache_test")
+            }
+        }.start()
+    }
+
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     private fun previewWeReadWallpaper() {
         if (isTestingWeRead) return
         saveWeReadApiKeyFromUi()
         val settings = readSettingsFromUi()
         saveSettings(settings)
         val periodLabel = weReadPeriodLabel(settings.periodMode)
+<<<<<<< HEAD
         val sourceLabel = "微信读书"
         isTestingWeRead = true
         changeStateText.text = "状态: 正在生成${sourceLabel}预览..."
+=======
+        val sourceLabel = if (settings.sourceMode == DataSourceMode.MIXED) "混合来源" else "微信读书"
+        isTestingWeRead = true
+        changeStateText.text = "状态: 正在生成${sourceLabel}预览..."
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "$sourceLabel：正在生成${periodLabel}预览..."
+        }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         Thread {
             val preview = buildSourcePreviewForWallpaperMode(settings)
             runOnUiThread {
@@ -1355,12 +2232,26 @@ class MainActivity : ComponentActivity() {
                 if (preview != null) {
                     previewBitmap = preview.bitmap
                     previewPresetText = wallpaperSizeDisplayText(readSettingsFromUi())
+<<<<<<< HEAD
+=======
+                    statusText.text = "${sourceLabel}预览已更新（未写入文件）\n${preview.summary}"
+                    changeStateText.text = "状态: ${sourceLabel}预览已更新｜尺寸: $previewPresetText"
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                     lastWeReadWallpaperDebug = "ok=true, period=$periodLabel, summary=${preview.summary}"
                     refreshPreview()
                     showPreviewPage()
                 } else {
+<<<<<<< HEAD
                     lastWeReadWallpaperDebug = "ok=false, period=$periodLabel"
                 }
+=======
+                    changeStateText.text = "状态: ${sourceLabel}预览失败"
+                    lastWeReadWallpaperDebug = "ok=false, period=$periodLabel"
+                }
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n账单预览：${lastWeReadWallpaperDebug.take(180)}"
+                }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                 appendUiDebug("weread wallpaper $lastWeReadWallpaperDebug")
                 writeDebugLog("weread_wallpaper_preview")
             }
@@ -1373,8 +2264,17 @@ class MainActivity : ComponentActivity() {
         val settings = readSettingsFromUi()
         saveSettings(settings)
         val periodLabel = weReadPeriodLabel(settings.periodMode)
+<<<<<<< HEAD
         val sourceLabel = "微信读书"
         isTestingWeRead = true
+=======
+        val sourceLabel = if (settings.sourceMode == DataSourceMode.MIXED) "混合来源" else "微信读书"
+        isTestingWeRead = true
+        changeStateText.text = "状态: 正在生成${sourceLabel}壁纸..."
+        if (::wereadStatusText.isInitialized) {
+            wereadStatusText.text = "$sourceLabel：正在生成并保存${periodLabel}壁纸..."
+        }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         Thread {
             val preview = buildSourcePreviewForWallpaperMode(settings)
             runOnUiThread {
@@ -1393,6 +2293,12 @@ class MainActivity : ComponentActivity() {
                     changeStateText.text = "状态: ${sourceLabel}生成失败"
                     lastWeReadWallpaperDebug = "ok=false, period=$periodLabel, saved=<none>"
                 }
+<<<<<<< HEAD
+=======
+                if (::wereadStatusText.isInitialized) {
+                    wereadStatusText.text = "${wereadStatusText.text}\n账单生成：${lastWeReadWallpaperDebug.take(180)}"
+                }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                 appendUiDebug("weread wallpaper generated $lastWeReadWallpaperDebug")
                 writeDebugLog("weread_wallpaper_generated")
             }
@@ -1400,11 +2306,181 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildWeReadPreviewForWallpaperMode(wallpaperMode: String): AutoWallpaperGenerator.PreviewResult? {
+<<<<<<< HEAD
         return AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
     }
 
     private fun buildSourcePreviewForWallpaperMode(settings: Settings): AutoWallpaperGenerator.PreviewResult? {
         return buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
+=======
+        return when (wallpaperMode) {
+            "COVER" -> AutoWallpaperGenerator.buildWeReadCoverPreviewFromPrefs(applicationContext, "W")
+            "AUTO_COVER" -> AutoWallpaperGenerator.buildWeReadCoverPreviewFromPrefs(applicationContext, "W")
+                ?: AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+            "CALENDAR" -> AutoWallpaperGenerator.buildWeReadCalendarPreviewFromPrefs(applicationContext, "W")
+            else -> AutoWallpaperGenerator.buildWeReadStatsPreviewFromPrefs(applicationContext, "W")
+        }
+    }
+
+    private fun buildSourcePreviewForWallpaperMode(settings: Settings): AutoWallpaperGenerator.PreviewResult? {
+        return if (settings.sourceMode == DataSourceMode.MIXED) {
+            AutoWallpaperGenerator.buildMixedPreviewFromPrefs(applicationContext, "A")
+        } else {
+            buildWeReadPreviewForWallpaperMode(settings.wallpaperMode)
+        }
+    }
+
+    private fun renderWeReadState(state: WeReadClient.State) {
+        if (!::wereadStatusText.isInitialized) return
+        val checkedAt = if (state.lastTestMs > 0L) {
+            SimpleDateFormat("MM-dd HH:mm", Locale.US).format(Date(state.lastTestMs))
+        } else {
+            "尚未测试"
+        }
+        val error = if (state.error.isBlank()) "" else "\n失败原因：${state.error.take(120)}"
+        wereadStatusText.text = "微信读书 Key：${state.maskedKey}\n连接状态：${state.status}\n最近测试：$checkedAt$error"
+    }
+
+    private fun checkForUpdatesIfNeeded(force: Boolean) {
+        if (!force && !GitHubReleaseChecker.shouldAutoCheck(this)) {
+            updateReleaseStatusFromCache()
+            return
+        }
+        if (isCheckingUpdates) return
+        isCheckingUpdates = true
+        if (::updateStatusText.isInitialized) {
+            updateStatusText.text = "当前版本：${GitHubReleaseChecker.currentVersionName(this)}\n更新状态：正在检查 GitHub Release..."
+        }
+        Thread {
+            val state = GitHubReleaseChecker.check(applicationContext)
+            runOnUiThread {
+                isCheckingUpdates = false
+                renderReleaseState(state)
+            }
+        }.start()
+    }
+
+    private fun renderReleaseState(state: GitHubReleaseChecker.State) {
+        if (!::updateStatusText.isInitialized) return
+        val checkedAt = if (state.lastCheckMs > 0L) {
+            SimpleDateFormat("MM-dd HH:mm", Locale.US).format(Date(state.lastCheckMs))
+        } else {
+            "尚未检查"
+        }
+        val latest = state.latestTag.ifBlank { "未知" }
+        val error = if (state.error.isBlank()) "" else "\n失败原因：${state.error.take(80)}"
+        updateStatusText.text = "当前版本：${GitHubReleaseChecker.currentVersionName(this)}\n最新版本：$latest\n更新状态：${state.status}\n最近检查：$checkedAt$error"
+    }
+
+    private fun openReleasePage() {
+        val url = GitHubReleaseChecker.cachedState(this).latestUrl.ifBlank { GitHubReleaseChecker.RELEASES_URL }
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            if (::updateStatusText.isInitialized) {
+                updateStatusText.text = "${updateStatusText.text}\n无法打开链接：${it.javaClass.simpleName}"
+            }
+        }
+    }
+
+    private fun showSponsorQrDialog() {
+        val density = resources.displayMetrics.density
+        fun dp(value: Int): Int = (value * density + 0.5f).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(8))
+        }
+        TextView(this).apply {
+            text = "如果阅迹壁纸刚好帮到了你，也欢迎请我喝杯奶茶 🧋\n(づ｡◕‿‿◕｡)づ"
+            textSize = 15f
+            setTextColor(Color.BLACK)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(12))
+            content.addView(this)
+        }
+        val qrImage = ImageView(this).apply {
+            visibility = View.GONE
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            content.addView(
+                this,
+                LinearLayout.LayoutParams(dp(240), dp(240)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                }
+            )
+        }
+        val state = TextView(this).apply {
+            text = "收款码加载中..."
+            textSize = 13f
+            setTextColor(Color.DKGRAY)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(10), 0, 0)
+            content.addView(this)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("请喝奶茶 (｡･ω･｡)ﾉ♡")
+            .setView(content)
+            .setNegativeButton("打开链接") { _, _ -> openSponsorQrLink() }
+            .setPositiveButton("关闭", null)
+            .show()
+        AutoRefreshLog.i(this, "sponsor qr dialog opened")
+        Thread {
+            val result = runCatching { loadSponsorQrBitmap() }
+            runOnUiThread {
+                if (!dialog.isShowing) return@runOnUiThread
+                result.onSuccess { bmp ->
+                    qrImage.setImageBitmap(bmp)
+                    qrImage.visibility = View.VISIBLE
+                    state.text = "支付宝扫一扫支持一下 ( •̀ ω •́ )✧"
+                }.onFailure {
+                    qrImage.visibility = View.GONE
+                    state.text = "收款码加载失败，可点击“打开链接”。\n$SPONSOR_QR_URL"
+                    AutoRefreshLog.e(this, "sponsor qr load failed", it)
+                }
+            }
+        }.start()
+    }
+
+    private fun loadSponsorQrBitmap(): Bitmap {
+        val conn = (URL(SPONSOR_QR_URL).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 8000
+            readTimeout = 12000
+            instanceFollowRedirects = true
+            requestMethod = "GET"
+        }
+        return try {
+            val code = conn.responseCode
+            if (code !in 200..299) error("HTTP $code")
+            conn.inputStream.use { input ->
+                BitmapFactory.decodeStream(input) ?: error("decode failed")
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun openSponsorQrLink() {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SPONSOR_QR_URL)))
+        }.onFailure {
+            if (::statusText.isInitialized) {
+                statusText.text = "无法打开收款码链接：${it.javaClass.simpleName}"
+            }
+        }
+    }
+
+    private fun openXhsProfile() {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(XHS_PROFILE_URL)))
+        }.onSuccess {
+            AutoRefreshLog.i(this, "xhs profile opened")
+        }.onFailure {
+            if (::statusText.isInitialized) {
+                statusText.text = "无法打开小红书主页：${it.javaClass.simpleName}\n$XHS_PROFILE_URL"
+            }
+            AutoRefreshLog.e(this, "open xhs profile failed", it)
+        }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     }
 
     private fun normalizeDailyTime(raw: String): String {
@@ -1448,8 +2524,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshPreviewData() {
+<<<<<<< HEAD
         previewWeReadWallpaper()
         collectMetadataDebugSample()
+=======
+        val settings = readSettingsFromUi()
+        if (settings.sourceMode == DataSourceMode.WEREAD || settings.sourceMode == DataSourceMode.MIXED) {
+            previewWeReadWallpaper()
+            collectMetadataDebugSample()
+            showPreviewPage()
+            return
+        }
+        applySettingsPreview()
+        collectMetadataDebugSample()
+        writeDebugLog("manual_refresh_preview")
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         showPreviewPage()
     }
 
@@ -1686,13 +2775,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun readSettingsFromUi(): Settings {
+<<<<<<< HEAD
         val includeUnread = false
         val showProgressStatus = true
         val minDurationMinutes = 5
+=======
+        val includeUnread = includeUnreadCheck.isChecked
+        val showChart = showChartCheck.isChecked
+        val showProgressStatus = showProgressStatusCheck.isChecked
+        val showAuthor = showAuthorCheck.isChecked
+        val showBookDuration = showBookDurationCheck.isChecked
+        val minDurationMinutes = minDurationInput.text.toString().trim().toIntOrNull()?.coerceAtLeast(0) ?: 1
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val topN = topNInput.text.toString().trim().toIntOrNull()?.coerceIn(1, 5) ?: 5
         val weekStart = selectedWeekStartYmd.ifBlank { currentWeekStartYmd() }
         val weekEnd = selectedWeekEndYmd.ifBlank { currentWeekEndYmd() }
         val periodMode = when (periodGroup.checkedRadioButtonId) {
+<<<<<<< HEAD
             4000 -> PeriodMode.RECENT
             4001 -> PeriodMode.THIS_WEEK
             4007 -> PeriodMode.THIS_MONTH
@@ -1700,15 +2799,73 @@ class MainActivity : ComponentActivity() {
         }
         val sourceMode = DataSourceMode.WEREAD
         val wallpaperMode = "STATS"
+=======
+            4000 -> PeriodMode.TODAY
+            4006 -> PeriodMode.YESTERDAY
+            4002 -> PeriodMode.LAST_WEEK
+            4007 -> PeriodMode.THIS_MONTH
+            4003 -> PeriodMode.LAST_7_DAYS
+            4004 -> PeriodMode.LAST_30_DAYS
+            4005 -> PeriodMode.CUSTOM
+            else -> PeriodMode.THIS_WEEK
+        }
+        val readingFilterMode = when (readingFilterGroup.checkedRadioButtonId) {
+            6002 -> ReadingFilterMode.READING_ONLY
+            6003 -> ReadingFilterMode.FINISHED_ONLY
+            else -> ReadingFilterMode.ALL
+        }
+        val sourceMode = when (sourceGroup.checkedRadioButtonId) {
+            1002 -> DataSourceMode.PATH_SESSION
+            1003 -> DataSourceMode.METADATA_ACCESS
+            1004 -> DataSourceMode.WEREAD
+            1005 -> DataSourceMode.MIXED
+            else -> DataSourceMode.DURATION
+        }
+        val wallpaperMode = when (wallpaperModeGroup.checkedRadioButtonId) {
+            1202 -> "COVER"
+            1203 -> "AUTO_COVER"
+            1204 -> "CALENDAR"
+            else -> "STATS"
+        }
+        val statsTemplate = when (statsTemplateGroup.checkedRadioButtonId) {
+            1242 -> "EXCERPT_MENU"
+            else -> "RECEIPT"
+        }
+        val calendarStackOrder = when (calendarStackOrderGroup.checkedRadioButtonId) {
+            1222 -> "SHORTEST_TOP"
+            1223 -> "LATEST_TOP"
+            else -> "LONGEST_TOP"
+        }
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val coverFitMode = when (coverFitModeGroup.checkedRadioButtonId) {
             1212 -> "CROP"
             else -> "FIT"
         }
+<<<<<<< HEAD
         val progressMode = "PERCENT"
+=======
+        val progressMode = when (progressModeGroup.checkedRadioButtonId) {
+            6102 -> "PERCENT"
+            else -> "PAGES"
+        }
+        val timeUnit = when (timeUnitGroup.checkedRadioButtonId) {
+            2002 -> "MINUTE"
+            else -> "HOUR"
+        }
+        val serialNumberMode = when (serialModeGroup.checkedRadioButtonId) {
+            2012 -> "RANDOM"
+            2013 -> "CUSTOM"
+            else -> "DATE"
+        }
+        val serialNumberCustomRaw = serialCustomInput.text.toString().trim()
+        val serialNumberCustom = serialNumberCustomRaw.filter { it.isDigit() }.take(12)
+        val serialNumberSize = serialNumberSizeInput.text.toString().trim().toFloatOrNull()?.coerceIn(24f, 140f) ?: 46f
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         val booxDevicePreset = booxPresetKeyByRadioId(booxDevicePresetGroup.checkedRadioButtonId)
         val fallbackPreset = BooxDevicePresets.byKey(if (booxDevicePreset == BooxDevicePresets.CUSTOM_KEY) BooxDevicePresets.DEFAULT_KEY else booxDevicePreset)
         val customWallpaperWidth = customWallpaperWidthInput.text.toString().trim().toIntOrNull()?.coerceIn(300, 4000) ?: fallbackPreset.widthPx
         val customWallpaperHeight = customWallpaperHeightInput.text.toString().trim().toIntOrNull()?.coerceIn(300, 4000) ?: fallbackPreset.heightPx
+<<<<<<< HEAD
         val receiptTitle = titleInput.text.toString().ifBlank { "Recipe" }
         val receiptTitleSize = titleSizeInput.text.toString().toFloatOrNull() ?: 90f
         val receiptBodySize = 34f
@@ -1718,17 +2875,60 @@ class MainActivity : ComponentActivity() {
         val titleFont = fontSpec(titleFontSpinner.selectedItem?.toString() ?: "asset://CevicheOne-Regular.ttf")
         val bodyFont = fontSpec(bodyFontSpinner.selectedItem?.toString() ?: "asset://迫真打字油印体.ttf")
         return Settings(includeUnread, showProgressStatus, minDurationMinutes, topN, weekStart, weekEnd, periodMode, sourceMode, wallpaperMode, coverFitMode, progressMode, receiptTitle, receiptTitleSize, receiptBodySize, weReadNickname, booxDevicePreset, customWallpaperWidth, customWallpaperHeight, noteText, titleFont, bodyFont, selectedStickerPath)
+=======
+        val receiptTitle = titleInput.text.toString().ifBlank { "阅读账单" }
+        val receiptTitleSize = titleSizeInput.text.toString().trim().toFloatOrNull()?.coerceIn(24f, 120f) ?: 74f
+        val receiptBodySize = bodySizeInput.text.toString().trim().toFloatOrNull()?.coerceIn(18f, 60f) ?: 34f
+        val chartStyleMode = when (chartStyleGroup.checkedRadioButtonId) {
+            7002 -> ChartStyleMode.BAR
+            else -> ChartStyleMode.LINE
+        }
+        val showPeakLabel = showPeakLabelCheck.isChecked
+        val yAxisMode = when (yAxisModeGroup.checkedRadioButtonId) {
+            7102 -> YAxisMode.FIXED
+            else -> YAxisMode.AUTO
+        }
+        val yAxisFixedMaxMinutes = yAxisMaxInput.text.toString().trim().toIntOrNull()?.coerceIn(1, 2000) ?: 300
+        val footerMode = when (footerModeGroup.checkedRadioButtonId) {
+            3002 -> "NOTE"
+            3003 -> "BARCODE"
+            else -> "NONE"
+        }
+        val noteText = noteInput.text.toString().trim()
+        val barcodeWidthScale = when (barcodeWidthGroup.checkedRadioButtonId) {
+            3101 -> 0.8f
+            3103 -> 1.2f
+            else -> 1.0f
+        }
+        val barcodeGapMode = when (barcodeGapGroup.checkedRadioButtonId) {
+            3111 -> "TIGHT"
+            3113 -> "LOOSE"
+            else -> "STANDARD"
+        }
+        val titleFont = fontSpec(titleFontSpinner.selectedItem?.toString() ?: "SERIF_BOLD")
+        val bodyFont = fontSpec(bodyFontSpinner.selectedItem?.toString() ?: "MONO")
+        return Settings(includeUnread, showChart, showProgressStatus, showAuthor, showBookDuration, minDurationMinutes, topN, weekStart, weekEnd, periodMode, readingFilterMode, sourceMode, wallpaperMode, statsTemplate, calendarStackOrder, coverFitMode, progressMode, timeUnit, receiptTitle, receiptTitleSize, receiptBodySize, serialNumberMode, serialNumberCustom, serialNumberSize, booxDevicePreset, customWallpaperWidth, customWallpaperHeight, footerMode, barcodeWidthScale, barcodeGapMode, noteText, chartStyleMode, showPeakLabel, yAxisMode, yAxisFixedMaxMinutes, titleFont, bodyFont)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     }
 
     private fun saveSettings(settings: Settings) {
         getSharedPreferences("wallpaper_settings", Context.MODE_PRIVATE)
             .edit()
             .putBoolean("include_unread", settings.includeUnread)
+<<<<<<< HEAD
             .putBoolean("show_progress_status", settings.showProgressStatus)
+=======
+            .putBoolean("show_chart", settings.showChart)
+            .putBoolean("show_progress_status", settings.showProgressStatus)
+            .putBoolean("show_author", settings.showAuthor)
+            .putBoolean("show_book_duration", settings.showBookDuration)
+            .putInt("min_duration_minutes", settings.minDurationMinutes)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
             .putInt("top_n", settings.topN)
             .putString("week_start", settings.weekStartYmd)
             .putString("week_end", settings.weekEndYmd)
             .putString("period_mode", settings.periodMode.name)
+<<<<<<< HEAD
             .putString("source_mode", settings.sourceMode.name)
             .putString("wallpaper_mode", settings.wallpaperMode)
 
@@ -1745,6 +2945,39 @@ class MainActivity : ComponentActivity() {
             .putString("title_font", settings.titleFont)
             .putString("body_font", settings.bodyFont)
             .putString("sticker_image_path", settings.stickerImagePath)
+=======
+            .putString("reading_filter_mode", settings.readingFilterMode.name)
+            .putString("source_mode", settings.sourceMode.name)
+            .putString("wallpaper_mode", settings.wallpaperMode)
+            .putString("stats_template", settings.statsTemplate)
+            .putString("calendar_stack_order", settings.calendarStackOrder)
+            .putString("cover_fit_mode", settings.coverFitMode)
+            .putString("progress_mode", settings.progressMode)
+            .putString("time_unit", settings.timeUnit)
+            .putString("receipt_title", settings.receiptTitle)
+            .putFloat("receipt_title_size", settings.receiptTitleSize)
+            .putFloat("receipt_body_size", settings.receiptBodySize)
+            .putString("serial_number_mode", settings.serialNumberMode)
+            .putString("serial_number_custom", settings.serialNumberCustom)
+            .putFloat("serial_number_size", settings.serialNumberSize)
+            .putString("boox_device_preset", settings.booxDevicePreset)
+            .putInt("custom_wallpaper_width", settings.customWallpaperWidth)
+            .putInt("custom_wallpaper_height", settings.customWallpaperHeight)
+            .putString("footer_mode", settings.footerMode)
+            .putFloat("barcode_width_scale", settings.barcodeWidthScale)
+            .putString("barcode_gap_mode", settings.barcodeGapMode)
+            .putString("note_text", settings.noteText)
+            .putString("chart_style_mode", settings.chartStyleMode.name)
+            .putBoolean("show_peak_label", settings.showPeakLabel)
+            .putBoolean(
+                AutoRefreshConfig.KEY_READING_DATA_STORE_ENABLED,
+                readingDataStoreCheck.isChecked
+            )
+            .putString("y_axis_mode", settings.yAxisMode.name)
+            .putInt("y_axis_fixed_max_minutes", settings.yAxisFixedMaxMinutes)
+            .putString("title_font", settings.titleFont)
+            .putString("body_font", settings.bodyFont)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
             .apply()
     }
 
@@ -1789,16 +3022,26 @@ class MainActivity : ComponentActivity() {
 
     private fun currentWeekStartYmd(): String {
         val cal = Calendar.getInstance(TimeZone.getDefault())
+<<<<<<< HEAD
         cal.firstDayOfWeek = Calendar.MONDAY
         //一周从周一开始
         cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+=======
+        cal.firstDayOfWeek = Calendar.SUNDAY
+        cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(cal.timeInMillis))
     }
 
     private fun currentWeekEndYmd(): String {
         val c = Calendar.getInstance(TimeZone.getDefault())
+<<<<<<< HEAD
         c.firstDayOfWeek = Calendar.MONDAY
         c.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+=======
+        c.firstDayOfWeek = Calendar.SUNDAY
+        c.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         c.add(Calendar.DAY_OF_MONTH, 6)
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(c.timeInMillis))
     }
@@ -1809,6 +3052,7 @@ class MainActivity : ComponentActivity() {
         report.append("fontTreeUri=").append(selectedFontDirUri ?: "<null>").append("\n")
         report.append("fontPermissionDebug=").append(fontPermissionDebug.ifBlank { "<empty>" }).append("\n")
 
+<<<<<<< HEAD
         try {
             assets.list("")?.forEach { fileName ->
                 if (fileName.endsWith(".ttf", true) || fileName.endsWith(".otf", true)) {
@@ -1820,6 +3064,8 @@ class MainActivity : ComponentActivity() {
             report.append("assetFontError=").append(e.message ?: "unknown").append("\n")
         }
 
+=======
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         if (!selectedFontDirUri.isNullOrBlank()) {
             try {
                 val treeUri = Uri.parse(selectedFontDirUri!!)
@@ -1924,6 +3170,11 @@ class MainActivity : ComponentActivity() {
                     .append(", lastTestMs=").append(wereadState.lastTestMs.toString())
                     .append(", error=").append(wereadState.error)
                     .append('\n')
+<<<<<<< HEAD
+=======
+                w.append("lastWeReadStats=").append(lastWeReadStatsDebug.ifBlank { "<empty>" }).append('\n')
+                w.append("lastWeReadCover=").append(lastWeReadCoverDebug.ifBlank { "<empty>" }).append('\n')
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                 w.append("lastWeReadWallpaper=").append(lastWeReadWallpaperDebug.ifBlank { "<empty>" }).append('\n')
                 w.append("currentPageKey=").append(currentPageKey).append('\n')
                 if (::settingsPage.isInitialized) {
@@ -1932,6 +3183,7 @@ class MainActivity : ComponentActivity() {
                 }
                 w.append("selectedWeekStart=").append(selectedWeekStartYmd).append('\n')
                 w.append("settings=").append("includeUnread=").append(s.includeUnread.toString())
+<<<<<<< HEAD
                     .append(", showProgressStatus=").append(s.showProgressStatus.toString())
                     .append(", topN=").append(s.topN.toString())
                     .append(", sourceMode=").append(s.sourceMode.name)
@@ -1945,6 +3197,31 @@ class MainActivity : ComponentActivity() {
                     .append(", booxDevicePreset=").append(s.booxDevicePreset)
                     .append(", customWallpaperWidth=").append(s.customWallpaperWidth.toString())
                     .append(", customWallpaperHeight=").append(s.customWallpaperHeight.toString())
+=======
+                    .append(", showChart=").append(s.showChart.toString())
+                    .append(", showProgressStatus=").append(s.showProgressStatus.toString())
+                    .append(", showAuthor=").append(s.showAuthor.toString())
+                    .append(", showBookDuration=").append(s.showBookDuration.toString())
+                    .append(", minDuration=").append(s.minDurationMinutes.toString())
+                    .append(", topN=").append(s.topN.toString())
+                    .append(", readingDataStoreEnabled=").append(readingDataStoreCheck.isChecked.toString())
+                    .append(", sourceMode=").append(s.sourceMode.name)
+                    .append(", wallpaperMode=").append(s.wallpaperMode)
+                    .append(", statsTemplate=").append(s.statsTemplate)
+                    .append(", coverFitMode=").append(s.coverFitMode)
+                    .append(", progressMode=").append(s.progressMode)
+                    .append(", timeUnit=").append(s.timeUnit)
+                    .append(", receiptTitle=").append(s.receiptTitle)
+                    .append(", receiptTitleSize=").append(s.receiptTitleSize.toString())
+                    .append(", receiptBodySize=").append(s.receiptBodySize.toString())
+                    .append(", serialNumberMode=").append(s.serialNumberMode)
+                    .append(", serialNumberCustom=").append(s.serialNumberCustom)
+                    .append(", serialNumberSize=").append(s.serialNumberSize.toString())
+                    .append(", booxDevicePreset=").append(s.booxDevicePreset)
+                    .append(", customWallpaperWidth=").append(s.customWallpaperWidth.toString())
+                    .append(", customWallpaperHeight=").append(s.customWallpaperHeight.toString())
+                    .append(", footerMode=").append(s.footerMode)
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                     .append(", noteText=").append(s.noteText)
                     .append(", titleFont=").append(s.titleFont)
                     .append(", bodyFont=").append(s.bodyFont)
@@ -1959,6 +3236,10 @@ class MainActivity : ComponentActivity() {
                 w.append('\n')
                 w.append(fontScanReport)
                 w.append('\n')
+<<<<<<< HEAD
+=======
+                w.append("barcodeDebug=").append(barcodeDebugReport.ifBlank { "<empty>" }).append('\n')
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                 w.append("metadataDebug=").append(metadataDebugReport.ifBlank { "<empty>" }).append('\n')
                 w.append("metadataRowsDebug=").append('\n').append(metadataRowsDebugReport.ifBlank { "<empty>" }).append('\n')
                 w.append("localCalendarProbe=").append('\n').append(localCalendarProbeReport.ifBlank { "<empty>" }).append('\n')

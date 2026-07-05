@@ -1,3 +1,7 @@
 <resources>
+<<<<<<< HEAD
     <string name="app_name">壁纸</string>
+=======
+    <string name="app_name">阅迹壁纸</string>
+>>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
 </resources>
