@@ -11,11 +11,7 @@ data class BooxDevicePreset(
 }
 
 object BooxDevicePresets {
-<<<<<<< HEAD
     const val DEFAULT_KEY = "POKE6"
-=======
-    const val DEFAULT_KEY = "LEAF5"
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     const val CUSTOM_KEY = "CUSTOM"
 
     val all: List<BooxDevicePreset> = listOf(

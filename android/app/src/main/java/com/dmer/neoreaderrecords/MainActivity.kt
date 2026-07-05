@@ -975,7 +975,7 @@ class MainActivity : ComponentActivity() {
         
         topNInput = makeInput(prefs.getInt("top_n", 5).coerceIn(1, 5).toString())
         titleInput = makeInput(prefs.getString("receipt_title", "Recipe") ?: "Recipe")
-        titleSizeInput = makeInput(prefs.getFloat("receipt_title_size", 90f).toString())
+        titleSizeInput = makeInput(prefs.getFloat("receipt_title_size", 90f).toInt().toString())
         nicknameInput = makeInput(prefs.getString("weread_nickname", "开卷有益") ?: "开卷有益")
 
         customWallpaperWidthInput = makeInput(prefs.getInt("custom_wallpaper_width", BooxDevicePresets.byKey(defaultBooxDevicePreset).widthPx).coerceIn(300, 4000).toString())

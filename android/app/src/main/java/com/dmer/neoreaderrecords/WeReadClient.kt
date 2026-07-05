@@ -19,10 +19,7 @@ object WeReadClient {
     private const val KEY_LAST_COVER_URL = "weread_last_cover_url"
     private const val KEY_LAST_COVER_PATH = "weread_last_cover_path"
     private const val KEY_LAST_COVER_BYTES = "weread_last_cover_bytes"
-<<<<<<< HEAD
     private const val KEY_WEREAD_NICKNAME = "weread_nickname"
-=======
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     private const val API_GATEWAY = "https://i.weread.qq.com/api/agent/gateway"
     private const val SKILL_VERSION = "1.0.4"
 
@@ -131,7 +128,6 @@ object WeReadClient {
             .apply()
     }
 
-<<<<<<< HEAD
     fun loadNickname(context: Context): String {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_WEREAD_NICKNAME, "")
@@ -145,8 +141,6 @@ object WeReadClient {
             .apply()
     }
 
-=======
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     fun cachedState(context: Context): State {
         val p = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return State(
@@ -196,7 +190,6 @@ object WeReadClient {
             val albumCount = albums?.length() ?: 0
             val hasMp = mp != null && mp != JSONObject.NULL
             val total = bookCount + albumCount + if (hasMp) 1 else 0
-<<<<<<< HEAD
             val nickname = json.optString("nickname", "").ifBlank {
                 json.optString("userInfo_nickname", "").ifBlank {
                     json.optString("userInfo", "")
@@ -205,8 +198,6 @@ object WeReadClient {
             if (nickname.isNotBlank() && !nickname.startsWith("{")) {
                 saveNickname(context, nickname)
             }
-=======
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
             saveSuccess(
                 context,
                 TestResult(
@@ -470,22 +461,6 @@ object WeReadClient {
         return null
     }
 
-<<<<<<< HEAD
-    
-=======
-    fun clearCoverCacheState(context: Context) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_LAST_COVER_BOOK_ID)
-            .remove(KEY_LAST_COVER_TITLE)
-            .remove(KEY_LAST_COVER_AUTHOR)
-            .remove(KEY_LAST_COVER_URL)
-            .remove(KEY_LAST_COVER_PATH)
-            .remove(KEY_LAST_COVER_BYTES)
-            .apply()
-    }
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
-
     private fun saveLatestCoverState(
         context: Context,
         bookId: String,
@@ -514,7 +489,6 @@ object WeReadClient {
         }
     }
 
-<<<<<<< HEAD
     private fun normalizeSeconds(value: Long): Long {
         return when {
             value <= 0L -> 0L
@@ -523,8 +497,6 @@ object WeReadClient {
         }
     }
 
-=======
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     fun fetchWallpaperStats(context: Context, apiKey: String, mode: String, baseTimeSeconds: Long? = null): WallpaperStatsResult {
         val key = apiKey.trim()
         if (key.isBlank()) {
@@ -560,14 +532,9 @@ object WeReadClient {
                 while (keys.hasNext()) {
                     val k = keys.next()
                     val ts = k.toLongOrNull() ?: continue
-<<<<<<< HEAD
                     val normalizedTs = normalizeEpochMs(ts) / 1000L
                     val seconds = normalizeSeconds(readTimes.optLong(k, 0L))
                     if (seconds > 0L) buckets.add(normalizedTs to seconds)
-=======
-                    val seconds = readTimes.optLong(k, 0L)
-                    if (seconds > 0L) buckets.add(ts to seconds)
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
                 }
             }
             buckets.sortBy { it.first }
@@ -588,7 +555,6 @@ object WeReadClient {
                     val bookId = book?.optString("bookId")?.takeIf { it.isNotBlank() }
                         ?: album?.optString("albumId")?.takeIf { it.isNotBlank() }?.let { "album:$it" }
                         .orEmpty()
-<<<<<<< HEAD
                     books.add(WallpaperBook(bookId, title, author, normalizeSeconds(item.optLong("readTime", 0L))))
                 }
             }
@@ -597,16 +563,6 @@ object WeReadClient {
             val detail = "${modeLabel(mode)}：${formatSeconds(total)}，阅读天数 $readDays，排行 ${books.size} 条"
             AutoRefreshLog.i(context, "WeRead wallpaper stats success mode=$mode total=$total buckets=${buckets.size} books=${books.size}")
             WallpaperStatsResult(true, "读取成功", detail, mode, normalizeEpochMs(json.optLong("baseTime", 0L)) / 1000L, total, readDays, buckets, books)
-=======
-                    books.add(WallpaperBook(bookId, title, author, item.optLong("readTime", 0L)))
-                }
-            }
-            val total = json.optLong("totalReadTime", 0L)
-            val readDays = json.optInt("readDays", 0)
-            val detail = "${modeLabel(mode)}：${formatSeconds(total)}，阅读天数 $readDays，排行 ${books.size} 条"
-            AutoRefreshLog.i(context, "WeRead wallpaper stats success mode=$mode total=$total buckets=${buckets.size} books=${books.size}")
-            WallpaperStatsResult(true, "读取成功", detail, mode, json.optLong("baseTime", 0L), total, readDays, buckets, books)
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         } catch (e: Exception) {
             AutoRefreshLog.e(context, "WeRead wallpaper stats failed mode=$mode", e)
             WallpaperStatsResult(false, "读取失败", "${e.javaClass.simpleName}: ${e.message ?: "读取失败"}", mode, 0L, 0L, 0, emptyList(), emptyList())
@@ -639,7 +595,6 @@ object WeReadClient {
             val book = json.optJSONObject("book")
             val progress = book?.optInt("progress", -1)?.takeIf { it >= 0 }
             val recordReadingTime = book?.optLong("recordReadingTime", 0L) ?: 0L
-<<<<<<< HEAD
             val readingTime = book?.optLong("readingTime", 0L) ?: 0L
             val readTime = book?.optLong("readTime", 0L) ?: 0L
             val totalSeconds = normalizeSeconds(recordReadingTime).takeIf { it > 0L }
@@ -648,11 +603,6 @@ object WeReadClient {
             val updateTimeMs = normalizeEpochMs(book?.optLong("updateTime", 0L) ?: 0L)
             AutoRefreshLog.i(context, "WeRead book progress success bookId=${bookId.take(10)} progress=${progress ?: -1} recordReadingTime=$recordReadingTime readingTime=$readingTime readTime=$readTime totalSeconds=$totalSeconds")
             BookProgressResult(true, progress, totalSeconds, updateTimeMs, "progress=${progress ?: "-"} totalSeconds=$totalSeconds")
-=======
-            val updateTimeMs = normalizeEpochMs(book?.optLong("updateTime", 0L) ?: 0L)
-            AutoRefreshLog.i(context, "WeRead book progress success bookId=${bookId.take(10)} progress=${progress ?: -1} recordReadingTime=$recordReadingTime updateTimeMs=$updateTimeMs")
-            BookProgressResult(true, progress, recordReadingTime, updateTimeMs, "progress=${progress ?: "-"} recordReadingTime=$recordReadingTime")
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
         } catch (e: Exception) {
             AutoRefreshLog.e(context, "WeRead book progress failed bookId=${bookId.take(10)}", e)
             BookProgressResult(false, null, 0L, 0L, "${e.javaClass.simpleName}: ${e.message ?: "读取失败"}")
@@ -722,7 +672,6 @@ object WeReadClient {
             AutoRefreshLog.e(context, "WeRead latest note failed bookId=${bookId.take(10)}", e)
             return LatestNoteResult(false, bookId, "", "", 0L, "${e.javaClass.simpleName}: ${e.message ?: "读取失败"}")
         }
-<<<<<<< HEAD
         if (candidates.isEmpty()) {
             return LatestNoteResult(true, bookId, "", "", 0L, "无可导出摘录")
         }
@@ -733,11 +682,6 @@ object WeReadClient {
             candidates.minByOrNull { it.text.length }
         } ?: candidates.maxByOrNull { it.createTimeMs }!!
         return LatestNoteResult(true, bookId, selected.text, selected.type, selected.createTimeMs, selected.type)
-=======
-        val latest = candidates.maxByOrNull { it.createTimeMs }
-            ?: return LatestNoteResult(true, bookId, "", "", 0L, "无可导出摘录")
-        return LatestNoteResult(true, bookId, latest.text, latest.type, latest.createTimeMs, latest.type)
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     }
 
 
@@ -812,15 +756,11 @@ object WeReadClient {
         val minutes = (seconds / 60L).coerceAtLeast(0L)
         val hours = minutes / 60L
         val remain = minutes % 60L
-<<<<<<< HEAD
         return when {
             hours > 0L && remain > 0L -> "${hours}h${remain}mins"
             hours > 0L -> "${hours}h"
             else -> "${remain}mins"
         }
-=======
-        return if (hours > 0L) "${hours}小时${remain}分钟" else "${remain}分钟"
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     }
 
     fun modeLabel(mode: String): String {

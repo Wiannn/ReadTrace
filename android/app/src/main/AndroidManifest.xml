@@ -8,11 +8,6 @@
     </queries>
 
     <uses-permission android:name="android.permission.INTERNET" />
-<<<<<<< HEAD
-    
-=======
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
@@ -54,19 +49,6 @@
             android:name=".ScreenOffMonitorService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
-
-<<<<<<< HEAD
-=======
-        <receiver
-            android:name=".BootCompletedReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
->>>>>>> 1da7563877afd714c7e61f5cd8bee0d6c4722469
     </application>
 
 </manifest>

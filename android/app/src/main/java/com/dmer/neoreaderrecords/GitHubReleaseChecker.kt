@@ -8,11 +8,11 @@ import java.net.URL
 import java.util.Locale
 
 object GitHubReleaseChecker {
-    const val RELEASES_URL = "https://github.com/wberry9813/ReadTrace/releases"
-    private const val LATEST_RELEASE_API = "https://api.github.com/repos/wberry9813/ReadTrace/releases/latest"
-    private const val RELEASES_API = "https://api.github.com/repos/wberry9813/ReadTrace/releases"
-    private const val TAGS_API = "https://api.github.com/repos/wberry9813/ReadTrace/tags"
-    private const val LATEST_RELEASE_PAGE = "https://github.com/wberry9813/ReadTrace/releases/latest"
+    const val RELEASES_URL = "https://github.com/Wiannn/ReadTrace/releases"
+    private const val LATEST_RELEASE_API = "https://api.github.com/repos/Wiannn/ReadTrace/releases/latest"
+    private const val RELEASES_API = "https://api.github.com/repos/Wiannn/ReadTrace/releases"
+    private const val TAGS_API = "https://api.github.com/repos/Wiannn/ReadTrace/tags"
+    private const val LATEST_RELEASE_PAGE = "https://github.com/Wiannn/ReadTrace/releases/latest"
     private const val PREFS_NAME = "github_release_update"
     private const val KEY_LAST_CHECK_MS = "update_last_check_ms"
     private const val KEY_LATEST_TAG = "update_latest_tag"
