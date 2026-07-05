@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置界面分组预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .preview-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .section {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .section:last-child {
+            border-bottom: none;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 12px;
+            padding-left: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f8f8f8;
+        }
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+        .setting-label {
+            font-size: 15px;
+            color: #333;
+        }
+        .setting-value {
+            font-size: 14px;
+            color: #999;
+        }
+        .segmented {
+            display: flex;
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 4px;
+        }
+        .segment-btn {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: center;
+            font-size: 13px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .segment-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        .segment-btn.inactive {
+            color: #666;
+        }
+        .slider-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            position: relative;
+            margin-top: 8px;
+        }
+        .slider-thumb {
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 50%;
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .input-box {
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #333;
+            min-width: 120px;
+            text-align: right;
+        }
+        .spinner-arrow {
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid #999;
+        }
+        .buttons-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+        .secret-input {
+            font-family: monospace;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="preview-container">
+        <div class="header">
+            <h1>壁纸设置</h1>
+        </div>
+
+        <div class="section">
+            <div class="section-title">基础设置</div>
+            <div class="setting-item">
+                <span class="setting-label">统计周期</span>
+                <div class="segmented">
+                    <div class="segment-btn active">最近</div>
+                    <div class="segment-btn inactive">本周</div>
+                    <div class="segment-btn inactive">本月</div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Top N（显示书籍数量）</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="input-box">5</span>
+                    <div class="slider-bar">
+                        <div class="slider-thumb" style="left: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">学厨名称</span>
+                <span class="input-box">开卷有益</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">外观设置</div>
+            <div class="setting-item">
+                <span class="setting-label">标题</span>
+                <span class="input-box">Recipe</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">标题字体大小</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="input-box">90</span>
+                    <div class="slider-bar">
+                        <div class="slider-thumb" style="left: 50%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">标题字体</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span class="setting-value">CevicheOne-Regular</span>
+                    <div class="spinner-arrow"></div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">正文字体</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span class="setting-value">迫真打字油印体</span>
+                    <div class="spinner-arrow"></div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">选择字体目录</span>
+                <span class="setting-value">未选择 ▼</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">选择贴纸</span>
+                <span class="setting-value">未选择 ▼</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">备注文本</span>
+                <span class="input-box">*祝你用餐愉快！*</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">尺寸设置</div>
+            <div class="setting-item">
+                <span class="setting-label">阅读器尺寸预设</span>
+                <div class="segmented">
+                    <div class="segment-btn active">Poke6</div>
+                    <div class="segment-btn inactive">Leaf5</div>
+                    <div class="segment-btn inactive">自定义</div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">自定义宽度(px)</span>
+                <span class="input-box">1448</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">自定义高度(px)</span>
+                <span class="input-box">1072</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">封面显示方式</span>
+                <div class="segmented">
+                    <div class="segment-btn active">完整显示</div>
+                    <div class="segment-btn inactive">铺满裁切</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">自动刷新</div>
+            <div class="setting-item">
+                <span class="setting-label">壁纸刷新模式</span>
+                <div class="segmented">
+                    <div class="segment-btn active">定时触发</div>
+                    <div class="segment-btn inactive">熄屏触发</div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">每日定时触发时间</span>
+                <span class="input-box">22:30</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">熄屏触发最小间隔(分钟)</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="input-box">3</span>
+                    <div class="slider-bar">
+                        <div class="slider-thumb" style="left: 1%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">数据配置</div>
+            <div class="setting-item">
+                <span class="setting-label">微信读书API Key</span>
+                <span class="input-box secret-input">*******</span>
+            </div>
+            <div class="buttons-row">
+                <button class="btn btn-primary">保存 Key</button>
+                <button class="btn btn-secondary">测试连接</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>壁纸 - 设置界面</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 0;
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+            background: #fff;
+        }
+        .header {
+            background: #6200ee;
+            color: white;
+            padding: 20px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(98,0,238,0.3);
+        }
+        .header-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .header-subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        .scroll-container {
+            padding: 0 16px 80px;
+            overflow-y: auto;
+            max-height: calc(100vh - 60px);
+        }
+        .section {
+            margin-top: 20px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            padding-left: 8px;
+            border-left: 3px solid #6200ee;
+        }
+        .section-hint {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 12px;
+            padding-left: 12px;
+            line-height: 1.4;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .row:active { background: #f8f8f8; }
+        .row:last-child { border-bottom: none; }
+        .label {
+            flex: 1;
+            font-size: 15px;
+            color: #333;
+        }
+        .value {
+            font-size: 14px;
+            color: #6200ee;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .arrow {
+            width: 16px;
+            height: 16px;
+            border-right: 2px solid #999;
+            border-bottom: 2px solid #999;
+            transform: rotate(-45deg);
+            margin-left: 4px;
+        }
+        .radio-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 8px 0;
+        }
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .radio-item.active {
+            background: #e8d5ff;
+            border-color: #6200ee;
+        }
+        .radio-dot {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ccc;
+            border-radius: 50%;
+            position: relative;
+        }
+        .radio-item.active .radio-dot { border-color: #6200ee; }
+        .radio-item.active .radio-dot::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: #6200ee;
+            border-radius: 50%;
+        }
+        .radio-text { font-size: 13px; color: #555; }
+        .radio-item.active .radio-text { color: #6200ee; font-weight: 500; }
+        .toggle {
+            width: 48px;
+            height: 28px;
+            background: #ddd;
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle.active { background: #6200ee; }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .toggle.active::after { transform: translateX(20px); }
+        .button {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .button-primary {
+            background: #6200ee;
+            color: white;
+        }
+        .button-primary:active { background: #5000cc; }
+        .button-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .button-secondary:active { background: #e0e0e0; }
+        .button-row {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+        }
+        .button-row .button { flex: 1; }
+        .hint-text {
+            font-size: 12px;
+            color: #999;
+            padding: 10px 12px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+        .status-text {
+            font-size: 15px;
+            color: #333;
+            padding: 16px 0;
+            margin-top: 16px;
+            border-top: 1px dashed #ddd;
+            min-height: 48px;
+        }
+        .preview-section {
+            margin-top: 20px;
+            background: #222;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .preview-header {
+            padding: 16px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .preview-title {
+            font-size: 14px;
+            color: #fff;
+            font-weight: 500;
+        }
+        .preview-ratio {
+            font-size: 12px;
+            color: #666;
+        }
+        .preview-image {
+            width: 100%;
+            aspect-ratio: 3/4;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+        }
+        .preview-content {
+            color: #fff;
+            font-family: Georgia, serif;
+        }
+        .preview-main-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 4px;
+            opacity: 0.95;
+        }
+        .preview-date {
+            font-size: 14px;
+            opacity: 0.6;
+            margin-bottom: 20px;
+        }
+        .preview-stats {
+            margin-top: 16px;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        .stat-label { opacity: 0.7; }
+        .stat-value { opacity: 1; }
+        .book-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .book-item:last-child { border-bottom: none; }
+        .book-title { opacity: 0.9; }
+        .book-meta { opacity: 0.5; font-size: 12px; }
+        .preview-footer {
+            font-size: 11px;
+            opacity: 0.4;
+            text-align: center;
+            margin-top: 16px;
+            padding-bottom: 12px;
+        }
+        .chart-bar {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 60px;
+            margin-top: 16px;
+            padding: 8px 0;
+        }
+        .bar {
+            flex: 1;
+            background: rgba(98,0,238,0.6);
+            border-radius: 4px 4px 0 0;
+            transition: height 0.5s ease;
+        }
+        .bar.active { background: rgba(98,0,238,0.9); }
+        .footer-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 12px 16px;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        .footer-bar .button { flex: 1; padding: 14px; font-size: 15px; }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 360px;
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .modal-close {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            color: #666;
+        }
+        .modal-body { padding: 16px; }
+        .modal-list { }
+        .modal-option {
+            padding: 14px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 15px;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-option:last-child { border-bottom: none; }
+        .modal-option.active { color: #6200ee; }
+        .modal-option.active::after {
+            content: '✓';
+            color: #6200ee;
+            font-weight: bold;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #6200ee;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        .loading-text {
+            font-size: 13px;
+            color: #6200ee;
+            margin-top: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-icon">📚</div>
+        <div>
+            <div class="header-title">壁纸</div>
+            <div class="header-subtitle">ReadTrace v1.0.5</div>
+        </div>
+    </div>
+
+    <div class="scroll-container">
+        <div class="section">
+            <div class="section-title">数据与统计</div>
+            <div class="section-hint">周期、数据来源、设备尺寸与时长单位</div>
+            
+            <div class="row" onclick="openModal('periodModal')">
+                <span class="label">统计周期</span>
+                <span class="value" id="periodValue">本周</span>
+                <span class="arrow"></span>
+            </div>
+            
+            <div class="row">
+                <span class="label">数据来源</span>
+                <span class="value">微信读书</span>
+            </div>
+            
+            <div class="row" onclick="openModal('deviceModal')">
+                <span class="label">设备尺寸</span>
+                <span class="value" id="deviceValue">Leaf 5 (1264×1680)</span>
+                <span class="arrow"></span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">书单筛选</div>
+            <div class="section-hint">控制展示书目与统计阈值</div>
+            
+            <div class="row" onclick="openModal('durationModal')">
+                <span class="label">最低阅读时长</span>
+                <span class="value" id="durationValue">10 分钟</span>
+                <span class="arrow"></span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">排版与字体</div>
+            <div class="section-hint">标题、字号、进度与字体</div>
+            
+            <div class="row" onclick="openModal('fontSizeModal')">
+                <span class="label">字体大小</span>
+                <span class="value" id="fontSizeValue">中等</span>
+                <span class="arrow"></span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">图表</div>
+            <div class="section-hint">图形样式与坐标设置</div>
+            
+            <div class="row">
+                <span class="label">显示图表</span>
+                <div class="toggle" id="chartToggle" onclick="toggleChart()"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">底部备注与条码</div>
+            <div class="section-hint">备注文本与装饰条码参数</div>
+            
+            <div class="row" onclick="openModal('footerModal')">
+                <span class="label">底部模式</span>
+                <span class="value" id="footerValue">备注文本</span>
+                <span class="arrow"></span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">自动刷新</div>
+            <div class="section-hint">默认自动模式，可切换定时或熄屏触发</div>
+            
+            <div class="row">
+                <span class="label">自动刷新</span>
+                <div class="toggle" id="autoToggle" onclick="toggleAuto()"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">微信读书</div>
+            <div class="section-hint">配置 API Key，支持手动生成与解锁预热刷新</div>
+            
+            <div class="row" onclick="openModal('weReadModal')">
+                <span class="label">API Key</span>
+                <span class="value" id="weReadValue">未配置</span>
+                <span class="arrow"></span>
+            </div>
+        </div>
+
+        <div class="status-text" id="statusText">设置后点击按钮生成。</div>
+
+        <div class="preview-section">
+            <div class="preview-header">
+                <span class="preview-title">壁纸预览</span>
+                <span class="preview-ratio" id="previewRatio">3:4</span>
+            </div>
+            <div class="preview-image" id="previewImage">
+                <div class="preview-content">
+                    <div class="preview-main-title" id="previewTitle">壁纸</div>
+                    <div class="preview-date" id="previewDate">2026年7月3日</div>
+                    <div class="preview-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">本周阅读</span>
+                            <span class="stat-value" id="statDuration">12小时30分</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">阅读书籍</span>
+                            <span class="stat-value" id="statBooks">3本</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">日均阅读</span>
+                            <span class="stat-value" id="statDaily">1小时51分</span>
+                        </div>
+                    </div>
+                    <div class="chart-bar" id="chartBar" style="display:none;">
+                        <div class="bar" style="height:40%"></div>
+                        <div class="bar" style="height:65%"></div>
+                        <div class="bar" style="height:80%"></div>
+                        <div class="bar" style="height:55%"></div>
+                        <div class="bar" style="height:90%"></div>
+                        <div class="bar" style="height:70%"></div>
+                        <div class="bar active" style="height:100%"></div>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <div class="book-item">
+                            <span class="book-title">活着</span>
+                            <span class="book-meta">余华 · 已读完</span>
+                        </div>
+                        <div class="book-item">
+                            <span class="book-title">三体</span>
+                            <span class="book-meta">刘慈欣 · 65%</span>
+                        </div>
+                        <div class="book-item">
+                            <span class="book-title">百年孤独</span>
+                            <span class="book-meta">马尔克斯 · 32%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="preview-footer">ReadTrace | 壁纸</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-bar">
+        <button class="button button-secondary" onclick="refreshPreview()">刷新预览</button>
+        <button class="button button-primary" onclick="generateWallpaper()">生成壁纸</button>
+    </div>
+
+    <div class="modal-overlay" id="periodModal" onclick="closeModal('periodModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title">统计周期</span>
+                <span class="modal-close" onclick="closeModal('periodModal')">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-option active" onclick="selectOption('periodModal', this, 'periodValue', '最近')">最近</div>
+                <div class="modal-option" onclick="selectOption('periodModal', this, 'periodValue', '本周')">本周</div>
+                <div class="modal-option" onclick="selectOption('periodModal', this, 'periodValue', '本月')">本月</div>
+                <div class="modal-option" onclick="selectOption('periodModal', this, 'periodValue', '今年')">今年</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deviceModal" onclick="closeModal('deviceModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title">设备尺寸</span>
+                <span class="modal-close" onclick="closeModal('deviceModal')">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-option" onclick="selectOption('deviceModal', this, 'deviceValue', 'Leaf 5 (1264×1680)')">Leaf 5 (1264×1680)</div>
+                <div class="modal-option" onclick="selectOption('deviceModal', this, 'deviceValue', 'Poke 6 (824×1200)')">Poke 6 (824×1200)</div>
+                <div class="modal-option" onclick="selectOption('deviceModal', this, 'deviceValue', 'Note X5 (1404×1872)')">Note X5 (1404×1872)</div>
+                <div class="modal-option active" onclick="selectOption('deviceModal', this, 'deviceValue', 'Leaf 5 (1264×1680)')">Leaf 5 (1264×1680)</div>
+                <div class="modal-option" onclick="selectOption('deviceModal', this, 'deviceValue', '自定义')">自定义</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="durationModal" onclick="closeModal('durationModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title">最低阅读时长</span>
+                <span class="modal-close" onclick="closeModal('durationModal')">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-option" onclick="selectOption('durationModal', this, 'durationValue', '不限')">不限</div>
+                <div class="modal-option" onclick="selectOption('durationModal', this, 'durationValue', '5 分钟')">5 分钟</div>
+                <div class="modal-option active" onclick="selectOption('durationModal', this, 'durationValue', '10 分钟')">10 分钟</div>
+                <div class="modal-option" onclick="selectOption('durationModal', this, 'durationValue', '30 分钟')">30 分钟</div>
+                <div class="modal-option" onclick="selectOption('durationModal', this, 'durationValue', '1 小时')">1 小时</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="fontSizeModal" onclick="closeModal('fontSizeModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title">字体大小</span>
+                <span class="modal-close" onclick="closeModal('fontSizeModal')">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-option" onclick="selectOption('fontSizeModal', this, 'fontSizeValue', '小')">小</div>
+                <div class="modal-option" onclick="selectOption('fontSizeModal', this, 'fontSizeValue', '较小')">较小</div>
+                <div class="modal-option active" onclick="selectOption('fontSizeModal', this, 'fontSizeValue', '中等')">中等</div>
+                <div class="modal-option" onclick="selectOption('fontSizeModal', this, 'fontSizeValue', '较大')">较大</div>
+                <div class="modal-option" onclick="selectOption('fontSizeModal', this, 'fontSizeValue', '大')">大</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="footerModal" onclick="closeModal('footerModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title">底部模式</span>
+                <span class="modal-close" onclick="closeModal('footerModal')">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-option" onclick="selectOption('footerModal', this, 'footerValue', '无')">无</div>
+                <div class="modal-option active" onclick="selectOption('footerModal', this, 'footerValue', '备注文本')">备注文本</div>
+                <div class="modal-option" onclick="selectOption('footerModal', this, 'footerValue', '装饰条码')">装饰条码</div>
+                <div class="modal-option" onclick="selectOption('footerModal', this, 'footerValue', '备注+条码')">备注+条码</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="weReadModal" onclick="closeModal('weReadModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title">微信读书 API Key</span>
+                <span class="modal-close" onclick="closeModal('weReadModal')">×</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="weReadInput" placeholder="请输入 API Key" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-size:14px; margin-bottom:12px;">
+                <button class="button button-primary" style="width:100%;" onclick="saveWeReadKey()">保存</button>
+                <div class="hint-text" style="margin-top:12px;">Key 只保存在本机 App 配置中，日志只记录脱敏后的 Key。</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chartEnabled = false;
+        let autoEnabled = false;
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('show');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        function selectOption(modalId, element, valueId, value) {
+            const modal = document.getElementById(modalId);
+            modal.querySelectorAll('.modal-option').forEach(opt => opt.classList.remove('active'));
+            element.classList.add('active');
+            document.getElementById(valueId).textContent = value;
+            closeModal(modalId);
+        }
+
+        function toggleChart() {
+            const toggle = document.getElementById('chartToggle');
+            chartEnabled = !chartEnabled;
+            toggle.classList.toggle('active', chartEnabled);
+            document.getElementById('chartBar').style.display = chartEnabled ? 'flex' : 'none';
+            updateStatus('设置已更新');
+        }
+
+        function toggleAuto() {
+            const toggle = document.getElementById('autoToggle');
+            autoEnabled = !autoEnabled;
+            toggle.classList.toggle('active', autoEnabled);
+            updateStatus(autoEnabled ? '自动刷新已开启' : '自动刷新已关闭');
+        }
+
+        function saveWeReadKey() {
+            const input = document.getElementById('weReadInput');
+            const key = input.value.trim();
+            if (key) {
+                document.getElementById('weReadValue').textContent = '已配置';
+                updateStatus('微信读书 Key 已保存');
+            } else {
+                document.getElementById('weReadValue').textContent = '未配置';
+                updateStatus('请输入有效的 API Key');
+            }
+            closeModal('weReadModal');
+        }
+
+        function checkUpdate() {
+            updateStatus('正在检查更新...');
+            setTimeout(() => {
+                updateStatus('当前已是最新版本 v1.0.5');
+            }, 1500);
+        }
+
+        function openRelease() {
+            updateStatus('正在打开 GitHub Release 页面...');
+        }
+
+        function refreshPreview() {
+            updateStatus('正在刷新预览...');
+            const progressBar = document.createElement('div');
+            progressBar.className = 'progress-bar';
+            progressBar.innerHTML = '<div class="progress-fill"></div>';
+            document.getElementById('statusText').innerHTML = '<div class="loading-text">正在加载数据...</div>';
+            document.getElementById('statusText').appendChild(progressBar);
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 20;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        document.getElementById('statusText').textContent = '预览已更新（未写入文件）';
+                        updatePreview();
+                    }, 300);
+                }
+                document.querySelector('.progress-fill').style.width = progress + '%';
+            }, 200);
+        }
+
+        function generateWallpaper() {
+            updateStatus('正在生成壁纸...');
+            const progressBar = document.createElement('div');
+            progressBar.className = 'progress-bar';
+            progressBar.innerHTML = '<div class="progress-fill"></div>';
+            document.getElementById('statusText').innerHTML = '<div class="loading-text">正在生成中...</div>';
+            document.getElementById('statusText').appendChild(progressBar);
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        document.getElementById('statusText').textContent = '已生成并覆盖文件\n路径: Pictures/NeoReader/neoreader_wallpaper.png';
+                    }, 300);
+                }
+                document.querySelector('.progress-fill').style.width = progress + '%';
+            }, 250);
+        }
+
+        function updateStatus(text) {
+            document.getElementById('statusText').textContent = text;
+        }
+
+        function updatePreview() {
+            const today = new Date();
+            document.getElementById('previewDate').textContent = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+            
+            const durations = ['8小时20分', '12小时30分', '15小时45分', '6小时10分'];
+            const books = ['2本', '3本', '4本', '5本'];
+            const daily = ['1小时14分', '1小时51分', '2小时20分', '52分'];
+            
+            document.getElementById('statDuration').textContent = durations[Math.floor(Math.random() * durations.length)];
+            document.getElementById('statBooks').textContent = books[Math.floor(Math.random() * books.length)];
+            document.getElementById('statDaily').textContent = daily[Math.floor(Math.random() * daily.length)];
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+            }
+        });
+    </script>
+</body>
+</html>
